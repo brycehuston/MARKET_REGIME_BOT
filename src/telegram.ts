@@ -1,0 +1,1190 @@
+﻿import { ActionGuidance, LeaderName, RegimeScoreResult } from "./types";
+
+const SEPARATOR = "\u2501".repeat(20);
+const TITLE_SEPARATOR = `\u2022 ${"\u2501".repeat(19)} \u2022`;
+const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01";
+
+export interface TempoTapeContext {
+  sessionPhase: string;
+  sessionElapsedMinutes: number | null;
+  activityState: string;
+  activityReason: string;
+  tempo: string;
+  tapeState: string;
+}
+
+export class TelegramClient {
+  private readonly botToken: string | undefined;
+  private readonly chatId: string | undefined;
+
+  constructor() {
+    this.botToken = process.env.TELEGRAM_BOT_TOKEN?.trim() || undefined;
+    this.chatId = process.env.TELEGRAM_CHAT_ID?.trim() || undefined;
+  }
+
+  isConfigured(): boolean {
+    return Boolean(this.botToken && this.chatId);
+  }
+
+  async sendMessage(text: string): Promise<void> {
+    if (!this.botToken || !this.chatId) {
+      throw new Error("Telegram is not configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env.");
+    }
+
+    const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: this.chatId,
+        text,
+        parse_mode: "HTML",
+        disable_web_page_preview: true
+      })
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Telegram sendMessage failed: HTTP ${response.status} ${response.statusText}. ${body.slice(0, 250)}`);
+    }
+  }
+}
+
+export function formatRegimeAlert(
+  result: RegimeScoreResult,
+  alertReason: string,
+  nextScanIso?: string,
+  previousResult?: RegimeScoreResult | null
+): string {
+  const guidance = getActionGuidance(result);
+  const tempoContext = buildTempoTapeContext(result, previousResult);
+  const nextScan = formatRelativeNextScan(nextScanIso);
+  const lines = [
+    TITLE_SEPARATOR,
+    "\u{1F514} MARKET MOVE \u{1F514}",
+    TITLE_SEPARATOR,
+    "",
+    labeledLine("Alert", buildMoveAlertLabel(result, previousResult, alertReason)),
+    labeledLine("Shift", buildMoveShiftLabel(result, previousResult)),
+    "",
+    labeledLine("Action", buildMoveActionLabel(result, guidance)),
+    labeledLine("Watch", buildMoveWatchLabel(result, guidance)),
+    labeledLine("Avoid", buildMoveAvoidLabel(result, guidance)),
+    labeledLine("Pressure", buildMovePressureLabel(result, guidance)),
+    "",
+    labeledLine("Why It Fired", ""),
+    ...buildMoveWhyLines(result, previousResult, alertReason).map(escapeHtml),
+    "",
+    labeledLine("Read", ""),
+    ...buildMoveReadLines(result, guidance).map(escapeHtml),
+    "",
+    labeledLine("Flip", ""),
+    ...buildMoveFlipLines(result, guidance).map(escapeHtml),
+    "",
+    ...labeledLines([
+      ["DeFi", defiLine(result)],
+      ...heatRows(result),
+      ["Tempo", tempoContext.tempo],
+      ["Tape", tempoContext.tapeState],
+      ...(previousResult ? [] : [["Score", `${result.score}/100`] as [string, string]]),
+      ["Next Scan", nextScan]
+    ]),
+    "",
+    SEPARATOR,
+    FOOTER
+  ];
+
+  return lines.join("\n");
+}
+
+export function formatHeartbeatAlert(
+  result: RegimeScoreResult,
+  nextScanIso: string,
+  previousResult?: RegimeScoreResult | null
+): string {
+  const guidance = getActionGuidance(result);
+  const tempoContext = buildTempoTapeContext(result, previousResult);
+  const nextScan = formatRelativeNextScan(nextScanIso);
+  const lines = [
+    TITLE_SEPARATOR,
+    "\u{1F4A0} ALPHA PULSE \u{1F4A0}",
+    TITLE_SEPARATOR,
+    "",
+    labeledLine("Mode", premiumModeLabel(result, guidance)),
+    "",
+    ...labeledLines([
+      ["Hold", premiumHoldNowLabel(result, guidance)],
+      ["Watch", premiumPulseWatchLine(result, guidance)],
+      ["Avoid", premiumPulseAvoidLine(result, guidance)],
+      ["DeFi", defiLine(result)],
+      ...heatRows(result),
+      ["Tempo", tempoContext.tempo]
+    ]),
+    "",
+    labeledLine("Flip", premiumPulseFlipSignal(result, guidance)),
+    "",
+    ...labeledLines([
+      ["Score", `${result.score}/100`],
+      ["Next Scan", nextScan]
+    ]),
+    "",
+    SEPARATOR,
+    FOOTER
+  ];
+
+  return lines.join("\n");
+}
+function buildMoveAlertLabel(
+  result: RegimeScoreResult,
+  previousResult: RegimeScoreResult | null | undefined,
+  alertReason: string
+): string {
+  if (!previousResult) return "SIGNAL UPDATE";
+
+  const scoreDelta = result.score - previousResult.score;
+  const leaderChanged = result.leader !== previousResult.leader;
+  const regimeChanged = result.regime !== previousResult.regime;
+
+  if (result.regime === "Risk-Off" || scoreDelta <= -15) {
+    return "MAJOR SHIFT \u26A0\uFE0F";
+  }
+
+  if (
+    result.regime === "Strong Risk-On / Rotation" ||
+    (scoreDelta > 0 && isRotationLeader(result.leader) && leaderChanged && !isRiskOffish(result.regime))
+  ) {
+    return "CLEAN FLIP \u26A1";
+  }
+
+  if (leaderChanged && isRotationLeader(result.leader) && !isStrongRiskOn(result.regime)) {
+    return "ROTATION HINT \u{1F9ED}";
+  }
+
+  if (scoreDelta <= -10) {
+    return "SCORE DROP \u26A0\uFE0F";
+  }
+
+  if (leaderChanged) {
+    return "WATCHLIST CHANGE \u{1F440}";
+  }
+
+  return alertReason ? "SIGNAL UPDATE" : "SIGNAL UPDATE";
+}
+
+function buildMoveShiftLabel(result: RegimeScoreResult, previousResult: RegimeScoreResult | null | undefined): string {
+  if (!previousResult) return "NEW SIGNAL";
+
+  if (result.regime !== previousResult.regime) {
+    return `${formatPublicStateLabel(previousResult)} \u2192 ${formatPublicStateLabel(result)}`;
+  }
+
+  if (result.leader !== previousResult.leader) {
+    return `${formatLeaderLabel(previousResult.leader)} \u2192 ${formatLeaderLabel(result.leader)}`;
+  }
+
+  if (result.score !== previousResult.score) {
+    return `Score ${previousResult.score}/100 \u2192 ${result.score}/100`;
+  }
+
+  return "NEW SIGNAL";
+}
+
+function buildMoveActionLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Mostly Stables \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "Wait / Stables \u{1F4A4}";
+  if (result.regime === "Strong Risk-On / Rotation") return "Leading Rotation \u26A1";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC Favored \u20BF";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH Favored \u2666\uFE0F";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL Favored \u25CE";
+  return "Leading Rotation \u26A1";
+}
+
+function buildMoveWatchLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive" || result.regime === "Neutral / Chop") return "\u20BF BTC repair";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "\u20BF BTC trend";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH/BTC";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL/BTC";
+  return "Strongest lane";
+}
+
+function buildMoveAvoidLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts \u{1F6AB}";
+  if (result.regime === "Neutral / Chop") return "Forcing Trades \u{1F6AB}";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Late Alts \u{1F6AB}";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes \u{1F6AB}";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Dead Memes \u{1F6AB}";
+  return "Dead Charts \u{1F6AB}";
+}
+
+function buildMovePressureLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off") return "High";
+  if (result.regime === "Defensive") return "Medium-High";
+  if (result.regime === "Neutral / Chop") return "Medium";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Medium";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Medium";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Medium-High";
+  return "Elevated";
+}
+
+function buildMoveWhyLines(
+  result: RegimeScoreResult,
+  previousResult: RegimeScoreResult | null | undefined,
+  alertReason: string
+): string[] {
+  if (!previousResult) {
+    return parseReasonLines(alertReason);
+  }
+
+  const lines: string[] = [];
+  const scoreDelta = result.score - previousResult.score;
+
+  if (scoreDelta !== 0) {
+    const label = scoreDelta > 0 ? "Score Improved" : "Score Dropped";
+    lines.push(`${label}: ${previousResult.score} \u2192 ${result.score}`);
+  }
+
+  if (result.regime !== previousResult.regime) {
+    lines.push(`Regime Flipped: ${formatCompactStateLabel(previousResult)} \u2192 ${formatCompactStateLabel(result)}`);
+  }
+
+  if (result.leader !== previousResult.leader) {
+    const label = result.leader === "Defensive" ? "Leader Faded" : "Leader Changed";
+    lines.push(`${label}: ${formatCompactLeaderLabel(previousResult.leader)} \u2192 ${formatCompactLeaderLabel(result.leader)}`);
+  }
+
+  if (lines.length === 0) {
+    return parseReasonLines(alertReason);
+  }
+
+  return lines.slice(0, 3);
+}
+
+function buildMoveReadLines(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off") return ["Risk got ugly.", "Stables first until BTC repairs."];
+  if (result.regime === "Defensive") return ["Still defensive.", "Risk has not earned trust yet."];
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return ["Market is messy.", "Wait for a cleaner lane."];
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return ["BTC is the cleanest lane.", "Alts still need proof."];
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return ["ETH is gaining on BTC.", "Watch for follow-through."];
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return ["SOL is leading.", "Avoid weak memes until confirmation."];
+  return ["Risk is open.", "Stick to the strongest lane."];
+}
+
+function buildMoveFlipLines(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") {
+    return ["BTC repair = first green light", "Score > 40 = pressure easing"];
+  }
+
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") {
+    return ["Clear leader = lane opens", "Score improves = risk can reopen"];
+  }
+
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") {
+    return ["BTC holds = lane stays open", "BTC fails = back to stables"];
+  }
+
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") {
+    return ["ETH/BTC holds = ETH confirms", "ETH/BTC fails = wait"];
+  }
+
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") {
+    return ["SOL/BTC holds = SOL confirms", "SOL cools = reduce risk"];
+  }
+
+  return ["Strongest lane holds = stay picky", "Score rolls over = tighten risk"];
+}
+
+function formatCompactStateLabel(result: RegimeScoreResult): string {
+  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
+  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "CHOP";
+  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON \u26A1";
+  if (result.regime === "Risk-On") return formatCompactLeaderLabel(result.leader);
+  return formatCompactLeaderLabel(result.leader);
+}
+
+function formatCompactLeaderLabel(leader: RegimeScoreResult["leader"]): string {
+  if (leader === "BTC-led") return "BTC WATCH \u20BF";
+  if (leader === "ETH-led") return "ETH ROTATION \u2666\uFE0F";
+  if (leader === "SOL-led") return "SOL ROTATION \u25CE";
+  if (leader === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
+  if (leader === "Mixed") return "MIXED";
+  return "ALT ROTATION";
+}
+
+function formatPublicStateLabel(result: RegimeScoreResult): string {
+  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
+  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "CHOP";
+  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON \u26A1";
+  if (result.regime === "Risk-On") return formatLeaderLabel(result.leader);
+  return formatLeaderLabel(result.leader);
+}
+
+function formatLeaderLabel(leader: RegimeScoreResult["leader"]): string {
+  if (leader === "BTC-led") return "BTC WATCH \u20BF";
+  if (leader === "ETH-led") return "ETH ROTATION \u2666\uFE0F";
+  if (leader === "SOL-led") return "SOL ROTATION \u25CE";
+  if (leader === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
+  if (leader === "Mixed") return "MIXED";
+  return "ALT ROTATION";
+}
+
+function isRotationLeader(leader: RegimeScoreResult["leader"]): boolean {
+  return leader === "BTC-led" || leader === "ETH-led" || leader === "SOL-led";
+}
+
+function isRiskOffish(regime: RegimeScoreResult["regime"]): boolean {
+  return regime === "Risk-Off" || regime === "Defensive";
+}
+
+function isStrongRiskOn(regime: RegimeScoreResult["regime"]): boolean {
+  return regime === "Strong Risk-On / Rotation";
+}
+
+function parseReasonLines(alertReason: string): string[] {
+  const cleaned = alertReason
+    .split(/[;\.]+/g)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (cleaned.length > 0) {
+    return cleaned;
+  }
+
+  return ["Signal changed.", "Review the new posture."];
+}
+
+export function getActionGuidance(result: RegimeScoreResult): ActionGuidance {
+  return applyDefiGuidance(getBaseActionGuidance(result), result);
+}
+
+function labeledLines(fields: Array<[string, string]>): string[] {
+  return fields.map(([label, value]) => labeledLine(label, value));
+}
+
+function labeledLine(label: string, value: string): string {
+  return `<b>${escapeHtml(label)}:</b>${value ? ` ${escapeHtml(value)}` : ""}`;
+}
+
+
+function premiumModeLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
+  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "CHOP / WAIT \u{1F4A4}";
+  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON, PICKY \u26A1";
+
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") {
+    return "BTC WATCH \u20BF";
+  }
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") {
+    return "ETH ROTATION \u2666\uFE0F";
+  }
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") {
+    return "SOL ROTATION \u25CE";
+  }
+
+  return "RISK-ON, PICKY \u26A1";
+}
+
+function premiumHoldNowLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Mostly Stables \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "Wait / Stables \u{1F4A4}";
+  if (result.regime === "Strong Risk-On / Rotation") return "Leading Rotation \u26A1";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC Favored \u20BF";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH Favored \u2666\uFE0F";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL Favored \u25CE";
+  return "Leading Rotation \u26A1";
+}
+
+function premiumPulseWatchLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive" || result.regime === "Neutral / Chop") return "\u20BF BTC";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "\u20BF BTC trend";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH/BTC";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL/BTC";
+  return "Strongest lane";
+}
+
+function premiumMoveWatchLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive" || result.regime === "Neutral / Chop") return "\u20BF BTC repair";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "\u20BF BTC trend";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH/BTC";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL/BTC";
+  return "Strongest lane";
+}
+
+function premiumMoveAvoidLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts \u{1F6AB}";
+  if (result.regime === "Neutral / Chop") return "Forcing Trades \u{1F6AB}";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Late Alts \u{1F6AB}";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes \u{1F6AB}";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Dead Memes \u{1F6AB}";
+  return "Dead Charts \u{1F6AB}";
+}
+
+function premiumPulseAvoidLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts";
+  if (result.regime === "Neutral / Chop") return "Forcing Trades";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Late Alts";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Dead Memes";
+  return "Dead Charts";
+}
+
+function premiumMoveReadLines(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off") return ["Risk is ugly.", "Stables still make sense."];
+  if (result.regime === "Defensive") return ["Still defensive.", "Risk has not earned trust yet."];
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return ["Market is messy.", "Wait for a cleaner lane."];
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return ["BTC is the cleanest lane.", "Alts still need proof."];
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return ["ETH is gaining on BTC.", "Watch for follow-through."];
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return ["SOL is leading.", "Avoid weak memes until confirmation."];
+  return ["Risk is open.", "Stick to the strongest lane."];
+}
+
+function premiumPulseFlipSignal(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "BTC repair = risk can reopen";
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return "Clear leader = lane opens";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC fails = back to stables";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH/BTC holds = ETH confirms";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL/BTC holds = SOL confirms";
+  return "Score rolls over = tighten risk";
+}
+
+function premiumMoveFlipSignal(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "BTC repair = first green light";
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return "Clear leader = lane opens";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC fails = back to stables";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH/BTC holds = ETH confirms";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL/BTC holds = SOL confirms";
+  return "Score rolls over = tighten risk";
+}
+function premiumMoveFlipSignals(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return ["BTC repair = first green light", "ETH/BTC up = ETH rotation", "SOL/BTC up = SOL watch"];
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return ["Clear leader appears", "Score improves", "Chop breaks"];
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return ["BTC holds trend", "ETH/BTC rises", "BTC fails = back to stables"];
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return ["ETH/BTC holds", "BTC stalls", "ETH/BTC fails = wait"];
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return ["SOL/BTC holds", "SOL/ETH holds", "SOL cools = reduce risk"];
+  return ["Strongest lane holds", "Score stays firm", "Score rolls over = tighten risk"];
+}
+
+function publicCallLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
+  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "CHOP / WAIT \u{1F4A4}";
+  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON, PICKY \u26A1";
+
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") {
+    return "BTC WATCH \u20BF";
+  }
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") {
+    return "ETH ROTATION \u2666\uFE0F";
+  }
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") {
+    return "SOL ROTATION \u25CE";
+  }
+
+  return "RISK-ON, PICKY \u26A1";
+}
+
+function positionLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "MOSTLY STABLES \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "WAIT / STABLES \u{1F4A4}";
+  if (result.regime === "Strong Risk-On / Rotation") return "LEADING ROTATION \u26A1";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC FAVORED \u20BF";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH FAVORED \u2666\uFE0F";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL FAVORED \u25CE";
+  return "LEADING ROTATION \u26A1";
+}
+
+function watchLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "\u2666\uFE0F ETH";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "\u25CE SOL";
+  return "\u20BF BTC";
+}
+
+function rotationLadder(action: ActionGuidance["action"]): [string, string, string] {
+  if (action === "BTC FOCUS" || action === "BTC WATCH") {
+    return [
+      "\u20BF BTC while trend holds",
+      "\u2666\uFE0F ETH if ETH/BTC wakes up",
+      "\u25CE SOL if SOL leads both"
+    ];
+  }
+
+  if (action === "ETH ROTATION" || action === "ETH WATCH") {
+    return [
+      "\u2666\uFE0F ETH while ETH/BTC holds",
+      "\u25CE SOL if SOL leads both",
+      "Stables if rotation fails"
+    ];
+  }
+
+  if (action === "SOL ROTATION") {
+    return [
+      "\u25CE SOL while SOL/BTC + SOL/ETH hold",
+      "Selective Solana ecosystem only",
+      "Stables if SOL loses strength"
+    ];
+  }
+
+  if (action === "SELECTIVE RISK-ON") {
+    return [
+      "Favor the strongest lane",
+      "Keep risk tight",
+      "Stables if score rolls over"
+    ];
+  }
+
+  return [
+    "\u20BF BTC if trend repairs",
+    "\u2666\uFE0F ETH if ETH/BTC breaks",
+    "\u25CE SOL if SOL leads both"
+  ];
+}
+
+function avoidLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts + meme traps \u{1F6AB}";
+  if (result.regime === "Neutral / Chop") return "Forcing Trades + meme traps \u{1F6AB}";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Chasing late alts \u{1F6AB}";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes \u{1F6AB}";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Dead Memes / weak charts \u{1F6AB}";
+  if (guidance.action === "SELECTIVE RISK-ON" || result.regime === "Strong Risk-On / Rotation") return "Dead Charts + obvious rugs \u{1F6AB}";
+  return "Forcing Trades + meme traps \u{1F6AB}";
+}
+
+function shortAvoidLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts";
+  if (result.regime === "Neutral / Chop") return "Forced entries";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Late Alts";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Weak memes";
+  return "Weak laggards";
+}
+
+function heatRows(result: RegimeScoreResult): Array<[string, string]> {
+  const heat = result.derivativesHeat;
+  if (!heat || heat.status === "Unavailable") return [];
+  if (!heat.publicLabel || heat.publicLabel.startsWith("Unavailable")) return [];
+  return [["Heat", heat.publicLabel]];
+}
+
+function defiLine(result: RegimeScoreResult): string {
+  const defiStatus = result.defiConfirmation?.status ?? "Unavailable";
+  switch (defiStatus) {
+    case "Strong":
+      return "Strong \u{1F30A}";
+    case "Mixed":
+      return "Mixed \u{1F32B}\uFE0F";
+    case "Weak":
+      return "Weak \u{1F9CA}";
+    case "Unavailable":
+      return "Unavailable \u26AA";
+  }
+}
+
+export function buildTempoTapeContext(
+  result: RegimeScoreResult,
+  previousResult?: RegimeScoreResult | null
+): TempoTapeContext {
+  const session = buildSessionContext(result.timestamp);
+  const activity = buildActivityState(result, previousResult, session);
+  const phase = session.sessionElapsedMinutes === null ? session.sessionPhase : `${session.sessionPhase} +${session.sessionElapsedMinutes}m`;
+
+  const tapeState = buildTapeState(result, previousResult, session);
+  const activityState = activity.state === tapeState ? fallbackActivityForSession(session.sessionPhase) : activity.state;
+
+  return {
+    sessionPhase: session.sessionPhase,
+    sessionElapsedMinutes: session.sessionElapsedMinutes,
+    activityState,
+    activityReason: activity.state === tapeState ? `${activity.reason}; separated tempo from tape` : activity.reason,
+    tempo: `${phase} \u2022 ${activityState}`,
+    tapeState
+  };
+}
+
+interface SessionContext {
+  sessionPhase: string;
+  sessionElapsedMinutes: number | null;
+  isWeekend: boolean;
+  isMalformed: boolean;
+}
+
+interface ActivityContext {
+  state: string;
+  reason: string;
+}
+
+function buildSessionContext(timestamp: string): SessionContext {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) {
+    return { sessionPhase: "Active session", sessionElapsedMinutes: null, isWeekend: false, isMalformed: true };
+  }
+
+  const day = date.getUTCDay();
+  const hour = date.getUTCHours();
+  const minute = date.getUTCMinutes();
+  const minutes = hour * 60 + minute;
+  const isWeekend = day === 0 || day === 6;
+
+  if (isWeekend) {
+    if (minutes < 7 * 60) return { sessionPhase: "Weekend Asia", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+    if (minutes < 13 * 60) return { sessionPhase: "Weekend London", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+    if (minutes < 21 * 60) return { sessionPhase: "Weekend NY", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+    return { sessionPhase: "Weekend late", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  }
+
+  if (minutes < 60) return { sessionPhase: "Asia open", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 6 * 60) return { sessionPhase: "Mid Asia", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 7 * 60) return { sessionPhase: "London pre-open", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 8 * 60 + 30) return { sessionPhase: "London open", sessionElapsedMinutes: minutes - 7 * 60, isWeekend, isMalformed: false };
+  if (minutes < 12 * 60) return { sessionPhase: "Mid London", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 13 * 60) return { sessionPhase: "London fade", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 16 * 60) return { sessionPhase: "London/NY overlap", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 18 * 60) return { sessionPhase: "NY open", sessionElapsedMinutes: minutes - 16 * 60, isWeekend, isMalformed: false };
+  if (minutes < 21 * 60) return { sessionPhase: "Mid NY", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  if (minutes < 23 * 60) return { sessionPhase: "NY fade", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+  return { sessionPhase: "Late session", sessionElapsedMinutes: null, isWeekend, isMalformed: false };
+}
+
+function buildActivityState(
+  result: RegimeScoreResult,
+  previousResult: RegimeScoreResult | null | undefined,
+  session: SessionContext
+): ActivityContext {
+  if (session.isMalformed) return { state: "steady activity", reason: "timestamp unavailable" };
+
+  const scoreDelta = previousResult ? result.score - previousResult.score : null;
+  const regimeChanged = Boolean(previousResult && result.regime !== previousResult.regime);
+  const leaderChanged = Boolean(previousResult && result.leader !== previousResult.leader);
+  const meaningfulChange = Boolean(
+    previousResult && (Math.abs(scoreDelta ?? 0) >= 10 || regimeChanged || leaderChanged)
+  );
+  const volume = volumeEvidence(result);
+  const activeHeat = hasActiveDerivativesHeat(result);
+  const sessionPhase = session.sessionPhase;
+
+  if (scoreDelta !== null && scoreDelta >= 15) return { state: "fast improvement", reason: "score increased by 15+" };
+  if (scoreDelta !== null && scoreDelta <= -15) return { state: "fast tape", reason: "score decreased by 15+" };
+
+  if (regimeChanged && isRiskOffish(result.regime)) {
+    return { state: "activity shifting", reason: "regime moved defensive" };
+  }
+
+  if (session.isWeekend) return weekendActivityState(sessionPhase, volume, meaningfulChange);
+
+  if ((regimeChanged && result.regime === "Strong Risk-On / Rotation") || (leaderChanged && isRotationLeader(result.leader))) {
+    return { state: "rotation active", reason: "regime or leader shifted toward rotation" };
+  }
+
+  if (sessionPhase === "London/NY overlap" && meaningfulChange) {
+    return { state: "high activity", reason: "overlap window with score/regime/leader movement" };
+  }
+
+  if (volume.isStrong || activeHeat) {
+    if (isOpeningOrOverlap(sessionPhase)) return { state: "high activity", reason: volume.reason ?? "active derivatives heat" };
+    return { state: "activity rising", reason: volume.reason ?? "active derivatives heat" };
+  }
+
+  if (volume.isWeak) {
+    if (session.isWeekend || isFadeOrLate(sessionPhase)) return { state: "liquidity thinning", reason: volume.reason ?? "weak volume during thin session" };
+    return { state: "activity slowing", reason: volume.reason ?? "weak volume" };
+  }
+
+  if (sessionPhase === "London pre-open") return { state: "setup forming", reason: "session fallback" };
+  if (sessionPhase === "London open" || sessionPhase === "NY open") return { state: "setup forming", reason: "opening window without activity confirmation" };
+  if (sessionPhase === "London/NY overlap") return { state: "steady activity", reason: "overlap without activity confirmation" };
+  if (sessionPhase === "London fade" || sessionPhase === "NY fade") return { state: "activity slowing", reason: "session fallback" };
+  if (sessionPhase === "Late session") return { state: "liquidity thinning", reason: "session fallback" };
+  if (sessionPhase === "Weekend Asia") return { state: "thin liquidity", reason: "weekend fallback" };
+  if (sessionPhase === "Weekend London") return { state: "chop risk high", reason: "weekend fallback" };
+  if (sessionPhase === "Weekend NY") return { state: "watch fake moves", reason: "weekend fallback" };
+  if (sessionPhase === "Weekend late") return { state: "liquidity thinning", reason: "weekend fallback" };
+
+  return { state: "steady activity", reason: "conservative fallback" };
+}
+
+function fallbackActivityForSession(sessionPhase: string): string {
+  if (sessionPhase === "London pre-open" || sessionPhase === "London open" || sessionPhase === "NY open") return "setup forming";
+  if (sessionPhase === "London fade" || sessionPhase === "NY fade") return "activity slowing";
+  if (sessionPhase === "Late session" || sessionPhase === "Weekend late") return "liquidity thinning";
+  if (sessionPhase === "Weekend Asia") return "thin liquidity";
+  if (sessionPhase === "Weekend London") return "chop risk high";
+  if (sessionPhase === "Weekend NY") return "watch fake moves";
+  return "steady activity";
+}
+function weekendActivityState(
+  sessionPhase: string,
+  volume: { hasData: boolean; isStrong: boolean; isWeak: boolean; reason: string | null },
+  meaningfulChange: boolean
+): ActivityContext {
+  if (sessionPhase === "Weekend Asia") return { state: "thin liquidity", reason: "weekend fallback" };
+  if (sessionPhase === "Weekend late") return { state: "liquidity thinning", reason: "weekend fallback" };
+  if (volume.isWeak || !volume.hasData) return { state: "chop risk high", reason: volume.reason ?? "weekend fallback" };
+  if (meaningfulChange || volume.isStrong) return { state: "watch fake moves", reason: volume.reason ?? "weekend movement" };
+  return { state: "chop risk high", reason: "weekend fallback" };
+}
+function buildTapeState(
+  result: RegimeScoreResult,
+  previousResult: RegimeScoreResult | null | undefined,
+  session: SessionContext
+): string {
+  const scoreDelta = previousResult ? result.score - previousResult.score : null;
+  const regimeChanged = Boolean(previousResult && result.regime !== previousResult.regime);
+  const leaderChanged = Boolean(previousResult && result.leader !== previousResult.leader);
+  const meaningfulChange = Boolean(
+    previousResult && (Math.abs(scoreDelta ?? 0) >= 10 || regimeChanged || leaderChanged)
+  );
+  const volume = volumeEvidence(result);
+
+  if (scoreDelta !== null && scoreDelta <= -15) return "fast risk-off pressure";
+  if (scoreDelta !== null && scoreDelta >= 15) return "fast improvement";
+  if (session.sessionPhase === "London/NY overlap" && meaningfulChange) return "fast tape";
+  if (session.isWeekend && (volume.isWeak || !volume.hasData)) return "thin liquidity";
+
+  if (isRiskOffish(result.regime)) {
+    if ((scoreDelta !== null && scoreDelta < 0) || (previousResult && !isRiskOffish(previousResult.regime))) return "risk-off pressure";
+    return "defensive tape";
+  }
+
+  if (result.regime === "Neutral / Chop") return "choppy / mixed";
+  if (result.leader === "BTC-led") return "BTC-led tape";
+  if (result.leader === "ETH-led") return "ETH rotation active";
+  if (result.leader === "SOL-led") return "SOL rotation active";
+  if (result.regime === "Strong Risk-On / Rotation") return "risk-on rotation";
+
+  return "steady tape";
+}
+
+function isOpeningOrOverlap(sessionPhase: string): boolean {
+  return sessionPhase === "London open" || sessionPhase === "NY open" || sessionPhase === "London/NY overlap";
+}
+
+function isFadeOrLate(sessionPhase: string): boolean {
+  return sessionPhase === "London fade" || sessionPhase === "NY fade" || sessionPhase === "Late session" || sessionPhase === "Weekend late";
+}
+
+function hasActiveDerivativesHeat(result: RegimeScoreResult): boolean {
+  const status = result.derivativesHeat?.status;
+  return Boolean(status && status !== "Unavailable" && status !== "Clean");
+}
+
+function volumeEvidence(result: RegimeScoreResult): { hasData: boolean; isStrong: boolean; isWeak: boolean; reason: string | null } {
+  const component = result.components.find((item) => item.name.toLowerCase().includes("volume"));
+  if (!component) return { hasData: false, isStrong: false, isWeak: false, reason: null };
+
+  const label = component.label.toLowerCase();
+  const reason = `volume ${component.label}`;
+  const isStrong =
+    component.score >= 3 ||
+    label.includes("strong") ||
+    label.includes("bullish") ||
+    label.includes("high") ||
+    label.includes("rising") ||
+    label.includes("improving");
+  const isWeak =
+    component.score <= -3 ||
+    label.includes("weak") ||
+    label.includes("bearish") ||
+    label.includes("low") ||
+    label.includes("falling") ||
+    label.includes("thin") ||
+    label.includes("declining");
+
+  return { hasData: true, isStrong, isWeak, reason };
+}
+function buildMarketRead(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off") {
+    return ["Risk is ugly.", "Stables are still doing their job."];
+  }
+
+  if (result.regime === "Defensive") {
+    return ["Still defensive.", "Rotation is forming, not confirmed."];
+  }
+
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") {
+    return ["Market is messy.", "Wait for a cleaner lane."];
+  }
+
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") {
+    return ["BTC is the cleanest lane.", "Alts still need proof."];
+  }
+
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") {
+    return ["ETH is gaining on BTC.", "Watch for follow-through."];
+  }
+
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") {
+    return ["SOL is leading.", "Avoid weak memes until confirmation."];
+  }
+
+  return ["Risk is open.", "Stick to the strongest lane."];
+}
+
+function buildPulseRead(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off") return ["Risk is ugly."];
+  if (result.regime === "Defensive") return ["Not safe enough yet."];
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return ["Market is messy."];
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return ["BTC is the cleanest lane."];
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return ["ETH is gaining on BTC."];
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return ["SOL is leading."];
+  return ["Risk is open. Stay picky."];
+}
+
+function flipSignals(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") {
+    return [
+      "BTC repair = first green light",
+      "ETH/BTC up = ETH rotation",
+      "SOL/BTC up = SOL watch"
+    ];
+  }
+
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") {
+    return [
+      "Clear leader appears",
+      "Score improves",
+      "Chop breaks"
+    ];
+  }
+
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") {
+    return [
+      "BTC holds trend",
+      "ETH/BTC rises",
+      "BTC fails = back to stables"
+    ];
+  }
+
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") {
+    return [
+      "ETH/BTC holds",
+      "BTC stalls",
+      "ETH/BTC fails = wait"
+    ];
+  }
+
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") {
+    return [
+      "SOL/BTC holds",
+      "SOL/ETH holds",
+      "SOL cools = reduce risk"
+    ];
+  }
+
+  return [
+    "Strongest lane holds",
+    "Score holds",
+    "Leadership fades = wait"
+  ];
+}
+
+function formatRelativeNextScan(nextScanIso: string | undefined): string {
+  if (!nextScanIso) return "~15m";
+
+  const nextScanMs = new Date(nextScanIso).getTime();
+  if (!Number.isFinite(nextScanMs)) return "~15m";
+
+  const minutes = Math.max(1, Math.round((nextScanMs - Date.now()) / 60000));
+  if (!Number.isFinite(minutes)) return "~15m";
+
+  const date = new Date(nextScanMs);
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${hour}:${minute} UTC (~${minutes}m)`;
+}
+
+function escapeHtml(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getBaseActionGuidance(result: RegimeScoreResult): ActionGuidance {
+  if (result.regime === "Risk-Off") {
+    return {
+      action: "STAY IN STABLES",
+      focus: "Protect capital",
+      avoid: "BTC, ETH, SOL, memes",
+      risk: "High",
+      confidence: "High",
+      why: ["Market structure is weak and no clean leader is confirmed."],
+      watch: defensiveWatch()
+    };
+  }
+
+  if (result.regime === "Defensive") {
+    return {
+      action: "WAIT / MOSTLY STABLES",
+      focus: "Preserve capital",
+      avoid: "Weak Alts and memes",
+      risk: "Medium-High",
+      confidence: "Medium-High",
+      why: ["Conditions are defensive and upside confirmation is not clean."],
+      watch: defensiveWatch()
+    };
+  }
+
+  if (result.regime === "Neutral / Chop") {
+    return neutralActionGuidance(result.leader);
+  }
+
+  if (result.regime === "Strong Risk-On / Rotation") {
+    return strongRiskOnActionGuidance(result.leader);
+  }
+
+  return riskOnActionGuidance(result.leader);
+}
+
+function applyDefiGuidance(guidance: ActionGuidance, result: RegimeScoreResult): ActionGuidance {
+  const defi = result.defiConfirmation;
+  if (!defi || defi.status === "Unavailable") return guidance;
+
+  return {
+    ...guidance,
+    why: buildDefiWhy(result, guidance.why),
+    watch: buildDefiWatch(result, guidance.watch)
+  };
+}
+
+function buildDefiWhy(result: RegimeScoreResult, fallback: string[]): string[] {
+  const defi = result.defiConfirmation;
+  if (!defi || defi.status === "Unavailable") return fallback;
+
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") {
+    if (defi.status === "Weak") return ["Conditions are defensive and DeFi activity is not confirming risk yet."];
+    if (defi.status === "Strong") return ["Conditions are defensive, but DeFi activity and liquidity are improving under the surface."];
+    return ["Conditions are defensive and DeFi confirmation is mixed."];
+  }
+
+  if (result.leader === "SOL-led") {
+    if (defi.status === "Strong" && defi.solanaActivity === "Improving") {
+      return ["SOL is outperforming BTC and ETH, and Solana activity is improving."];
+    }
+    if (defi.status === "Weak") {
+      return ["SOL is outperforming, but DeFi activity and liquidity are not confirming risk yet."];
+    }
+    return ["SOL is leading, with mixed DeFi confirmation."];
+  }
+
+  if (defi.status === "Strong") return ["Market structure is constructive and DeFi activity confirms improving risk conditions."];
+  if (defi.status === "Weak") return ["Price signals are present, but DeFi activity and liquidity do not confirm risk yet."];
+  return ["Market signals are mixed and DeFi confirmation is not clean yet."];
+}
+
+function buildDefiWatch(result: RegimeScoreResult, fallback: string[]): string[] {
+  const defi = result.defiConfirmation;
+  if (!defi || defi.status === "Unavailable") return fallback;
+
+  if (result.leader === "SOL-led" && defi.solanaActivity === "Improving") {
+    return [
+      "SOL/BTC continuation = rotation holds",
+      "SOL/ETH continuation = SOL remains leader",
+      "Solana activity cooling = reduce confidence"
+    ];
+  }
+
+  if ((result.regime === "Risk-Off" || result.regime === "Defensive") && defi.liquidity !== "Unavailable") {
+    return [
+      "Score recovery = risk can reopen",
+      "Stable liquidity improving = pressure eases",
+      "BTC trend repair = first confirmation"
+    ];
+  }
+
+  return fallback;
+}
+function neutralActionGuidance(leader: LeaderName): ActionGuidance {
+  if (leader === "BTC-led") {
+    return {
+      action: "BTC WATCH",
+      focus: "BTC strength",
+      avoid: "Chasing alts early",
+      risk: "Medium",
+      confidence: "Medium",
+      why: ["BTC is the clearest relative lane, but the broader market is still choppy."],
+      watch: btcWatch()
+    };
+  }
+
+  if (leader === "ETH-led") {
+    return {
+      action: "ETH WATCH",
+      focus: "ETH rotation setup",
+      avoid: "Chasing weak SOL/memes",
+      risk: "Medium",
+      confidence: "Medium",
+      why: ["ETH is showing relative strength, but market confirmation is still incomplete."],
+      watch: ethWatch()
+    };
+  }
+
+  if (leader === "SOL-led") {
+    return {
+      action: "WAIT / MOSTLY STABLES",
+      focus: "SOL strength building",
+      avoid: "Chasing BTC or memes",
+      risk: "Medium",
+      confidence: "Medium",
+      why: ["BTC is still weak, but SOL is outperforming.", "No full risk-on signal yet."],
+      watch: solWatch()
+    };
+  }
+
+  return {
+    action: "NO CLEAN EDGE",
+    focus: "Mostly Stables",
+    avoid: "Forcing Trades",
+    risk: "Medium",
+    confidence: "Low-Medium",
+    why: ["Signals are mixed and rotation is not confirmed."],
+    watch: mixedWatch()
+  };
+}
+
+function riskOnActionGuidance(leader: LeaderName): ActionGuidance {
+  if (leader === "BTC-led") {
+    return {
+      action: "BTC FOCUS",
+      focus: "BTC strength",
+      avoid: "Chasing late alts",
+      risk: "Medium",
+      confidence: "Medium-High",
+      why: ["BTC is leading while alt rotation is not the strongest lane yet."],
+      watch: btcWatch()
+    };
+  }
+
+  if (leader === "ETH-led") {
+    return {
+      action: "ETH ROTATION",
+      focus: "ETH over BTC",
+      avoid: "Weak SOL/Memes",
+      risk: "Medium",
+      confidence: "Medium-High",
+      why: ["ETH is gaining relative strength and rotation is improving."],
+      watch: ethWatch()
+    };
+  }
+
+  if (leader === "SOL-led") {
+    return {
+      action: "SOL ROTATION",
+      focus: "SOL strength",
+      avoid: "Weak memes until confirmation",
+      risk: "Medium-High",
+      confidence: "Medium-High",
+      why: ["SOL is outperforming BTC and ETH while market conditions are risk-on."],
+      watch: solWatch()
+    };
+  }
+
+  return {
+    action: "SELECTIVE RISK-ON",
+    focus: "Confirmed leaders only",
+    avoid: "Weak laggards and memes",
+    risk: "Medium-High",
+    confidence: "Medium",
+    why: ["Risk-on conditions are present, but leadership is not clean."],
+    watch: mixedWatch()
+  };
+}
+
+function strongRiskOnActionGuidance(leader: LeaderName): ActionGuidance {
+  if (leader === "SOL-led") {
+    return {
+      action: "SELECTIVE RISK-ON",
+      focus: "SOL + strong Solana ecosystem names",
+      avoid: "Dead/weak memes",
+      risk: "High",
+      confidence: "High",
+      why: ["Market structure supports rotation and SOL is the leading lane."],
+      watch: solWatch()
+    };
+  }
+
+  if (leader === "ETH-led") {
+    return {
+      action: "ETH ROTATION",
+      focus: "ETH-led rotation",
+      avoid: "Weak SOL/Memes",
+      risk: "High",
+      confidence: "High",
+      why: ["Market structure supports rotation and ETH is the leading lane."],
+      watch: ethWatch()
+    };
+  }
+
+  if (leader === "BTC-led") {
+    return {
+      action: "BTC FOCUS",
+      focus: "BTC trend strength",
+      avoid: "Late weak alts",
+      risk: "High",
+      confidence: "High",
+      why: ["Market structure supports risk-on exposure and BTC is leading."],
+      watch: btcWatch()
+    };
+  }
+
+  return {
+    action: "SELECTIVE RISK-ON",
+    focus: "Strongest confirmed lanes",
+    avoid: "Dead/weak memes",
+    risk: "High",
+    confidence: "High",
+    why: ["Market structure supports rotation, but leadership is broad."],
+    watch: mixedWatch()
+  };
+}
+
+function btcWatch(): string[] {
+  return [
+    "BTC continuation = BTC lane stays open",
+    "Alt ratios weak = avoid chasing rotation",
+    "BTC loses strength = reduce risk"
+  ];
+}
+
+function ethWatch(): string[] {
+  return [
+    "ETH/BTC continuation = ETH rotation improves",
+    "BTC stays stable = rotation has room",
+    "ETH/BTC fails = reduce ETH focus"
+  ];
+}
+
+function solWatch(): string[] {
+  return [
+    "BTC reclaim strength = BTC lane opens",
+    "ETH/BTC breakout = ETH rotation",
+    "SOL holds strength = SOL lane improves"
+  ];
+}
+
+function defensiveWatch(): string[] {
+  return [
+    "Score recovery = risk can reopen",
+    "Stable dominance cooling = pressure eases",
+    "BTC trend repair = first confirmation"
+  ];
+}
+
+function mixedWatch(): string[] {
+  return [
+    "BTC reclaim strength = BTC lane opens",
+    "ETH/BTC breakout = ETH rotation",
+    "SOL/BTC holds strength = SOL lane improves"
+  ];
+}
+
+
+
+
+
+
+

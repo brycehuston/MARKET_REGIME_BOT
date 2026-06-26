@@ -1,0 +1,53 @@
+{
+  "scanIntervalMinutes": 15,
+  "primaryTimeframe": "1d",
+  "confirmationTimeframe": "4h",
+  "timingTimeframe": "1h",
+  "candleLimit": 300,
+  "providers": {
+    "marketDataPrimary": "coingecko",
+    "binanceBaseUrls": [
+      "https://api.binance.com",
+      "https://api1.binance.com",
+      "https://api2.binance.com",
+      "https://api3.binance.com"
+    ],
+    "bybitBaseUrl": "https://api.bybit.com",
+    "coingeckoBaseUrl": "https://api.coingecko.com/api/v3"
+  },
+  "defiLlama": {
+    "confirmationEnabled": true,
+    "baseUrl": "https://api.llama.fi",
+    "timeoutMs": 10000
+  },
+  "assets": {
+    "btcUsdt": "BTCUSDT",
+    "ethUsdt": "ETHUSDT",
+    "solUsdt": "SOLUSDT",
+    "ethBtc": "ETHBTC",
+    "solBtc": "SOLBTC"
+  },
+  "stablecoinDominanceSymbols": [
+    "usdt",
+    "usdc",
+    "dai",
+    "usde",
+    "usds",
+    "fdusd",
+    "tusd"
+  ],
+  "alertRules": {
+    "enabled": true,
+    "minScoreDelta": 15,
+    "cooldownMinutes": 360,
+    "criticalCooldownMinutes": 60,
+    "sendStartupAlert": false
+  },
+  "paths": {
+    "stateFile": "data/current_state.json",
+    "scoreCsv": "logs/regime_scores.csv",
+    "alertCsv": "logs/regime_alerts.csv",
+    "snapshotJsonl": "logs/regime_snapshots.jsonl",
+    "errorLog": "logs/errors.log"
+  }
+}

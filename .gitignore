@@ -1,0 +1,10 @@
+﻿.env
+.env.*
+!.env.example
+node_modules/
+dist/
+logs/
+data/
+*.log
+commands.txt
+.agents/

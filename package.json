@@ -1,0 +1,29 @@
+{
+  "name": "market-regime-bot",
+  "version": "1.0.0",
+  "description": "Alert-only crypto market regime classifier for BTC/ETH/SOL risk-on and risk-off conditions.",
+  "main": "dist/index.js",
+  "scripts": {
+    "once": "tsx src/index.ts --once",
+    "dev": "tsx src/index.ts --loop",
+    "accuracy": "tsx src/accuracy.ts",
+    "accuracy:coach": "tsx src/accuracyCoach.ts",
+    "backtest": "tsx src/backtest.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js --loop",
+    "test:telegram": "tsx src/testTelegram.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}
+
