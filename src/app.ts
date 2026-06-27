@@ -5,7 +5,7 @@ import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
 import { buildRatioCandles } from "./indicators";
 import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
-import { TelegramClient, buildTempoTapeContext, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
+import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
 import {
   loadState,
@@ -297,10 +297,12 @@ export class MarketRegimeBot {
     nextScanIso: string
   ): AccuracySnapshotFields {
     const tempoContext = buildTempoTapeContext(result, previousResult);
+    const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
 
     return {
       actionMode: guidance.action,
       confidence: guidance.confidence,
+      regimeConfidence,
       defiStatus: result.defiConfirmation?.status ?? "Unavailable",
       derivativesHeatStatus: result.derivativesHeat?.status ?? "Unavailable",
       derivativesHeatLabel: result.derivativesHeat?.publicLabel ?? "Unavailable ?",
@@ -370,6 +372,7 @@ export class MarketRegimeBot {
         `Bias: ${result.researchBias}`,
         `DeFi: ${result.defiConfirmation?.status ?? "Unavailable"}`,
         `Heat: ${result.derivativesHeat?.publicLabel ?? "Unavailable ?"}`,
+        `Regime confidence: ${deriveRegimeConfidence(result, null)}`,
         "",
         "Components:",
         `BTC Trend: ${this.formatComponentScore(result, "BTC trend / structure")}`,

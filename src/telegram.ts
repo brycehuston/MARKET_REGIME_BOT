@@ -1,4 +1,4 @@
-﻿import { ActionGuidance, LeaderName, RegimeScoreResult } from "./types";
+﻿import { ActionGuidance, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
 
 const SEPARATOR = "\u2501".repeat(20);
 const TITLE_SEPARATOR = `\u2022 ${"\u2501".repeat(19)} \u2022`;
@@ -58,7 +58,9 @@ export function formatRegimeAlert(
 ): string {
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
+  const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
+  const marketActivity = defiLine(result);
   const lines = [
     TITLE_SEPARATOR,
     "\u{1F514} MARKET MOVE \u{1F514}",
@@ -66,8 +68,9 @@ export function formatRegimeAlert(
     "",
     labeledLine("Alert", buildMoveAlertLabel(result, previousResult, alertReason)),
     labeledLine("Shift", buildMoveShiftLabel(result, previousResult)),
+    labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
     "",
-    labeledLine("Action", buildMoveActionLabel(result, guidance)),
+    labeledLine("Plan", buildMoveActionLabel(result, guidance)),
     labeledLine("Watch", buildMoveWatchLabel(result, guidance)),
     labeledLine("Avoid", buildMoveAvoidLabel(result, guidance)),
     labeledLine("Pressure", buildMovePressureLabel(result, guidance)),
@@ -78,14 +81,14 @@ export function formatRegimeAlert(
     labeledLine("Read", ""),
     ...buildMoveReadLines(result, guidance).map(escapeHtml),
     "",
-    labeledLine("Flip", ""),
+    labeledLine("Risk Back If", ""),
     ...buildMoveFlipLines(result, guidance).map(escapeHtml),
     "",
     ...labeledLines([
-      ["DeFi", defiLine(result)],
+      ...optionalLabeledRow("Market Activity", marketActivity),
       ...heatRows(result),
-      ["Tempo", tempoContext.tempo],
-      ["Tape", tempoContext.tapeState],
+      ["Session", tempoContext.tempo],
+      ["Market Pressure", tempoContext.tapeState],
       ...(previousResult ? [] : [["Score", `${result.score}/100`] as [string, string]]),
       ["Next Scan", nextScan]
     ]),
@@ -104,24 +107,27 @@ export function formatHeartbeatAlert(
 ): string {
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
+  const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
+  const marketActivity = defiLine(result);
   const lines = [
     TITLE_SEPARATOR,
     "\u{1F4A0} ALPHA PULSE \u{1F4A0}",
     TITLE_SEPARATOR,
     "",
     labeledLine("Mode", premiumModeLabel(result, guidance)),
+    labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
     "",
     ...labeledLines([
-      ["Hold", premiumHoldNowLabel(result, guidance)],
+      ["Plan", premiumHoldNowLabel(result, guidance)],
       ["Watch", premiumPulseWatchLine(result, guidance)],
       ["Avoid", premiumPulseAvoidLine(result, guidance)],
-      ["DeFi", defiLine(result)],
+      ...optionalLabeledRow("Market Activity", marketActivity),
       ...heatRows(result),
-      ["Tempo", tempoContext.tempo]
+      ["Session", tempoContext.tempo]
     ]),
     "",
-    labeledLine("Flip", premiumPulseFlipSignal(result, guidance)),
+    labeledLine("Risk Back If", premiumPulseFlipSignal(result, guidance)),
     "",
     ...labeledLines([
       ["Score", `${result.score}/100`],
@@ -190,13 +196,13 @@ function buildMoveShiftLabel(result: RegimeScoreResult, previousResult: RegimeSc
 }
 
 function buildMoveActionLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
-  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Mostly Stables \u{1F6E1}\uFE0F";
-  if (result.regime === "Neutral / Chop") return "Wait / Stables \u{1F4A4}";
-  if (result.regime === "Strong Risk-On / Rotation") return "Leading Rotation \u26A1";
-  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC Favored \u20BF";
-  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH Favored \u2666\uFE0F";
-  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL Favored \u25CE";
-  return "Leading Rotation \u26A1";
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Mostly Stables";
+  if (result.regime === "Neutral / Chop") return "Wait / Stables";
+  if (result.regime === "Strong Risk-On / Rotation") return "Leading Rotation";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC Favored";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH Favored";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL Favored";
+  return "Leading Rotation";
 }
 
 function buildMoveWatchLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
@@ -208,12 +214,12 @@ function buildMoveWatchLabel(result: RegimeScoreResult, guidance: ActionGuidance
 }
 
 function buildMoveAvoidLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
-  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts \u{1F6AB}";
-  if (result.regime === "Neutral / Chop") return "Forcing Trades \u{1F6AB}";
-  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Late Alts \u{1F6AB}";
-  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes \u{1F6AB}";
-  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Dead Memes \u{1F6AB}";
-  return "Dead Charts \u{1F6AB}";
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Weak Alts";
+  if (result.regime === "Neutral / Chop") return "Forcing Trades";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "Late Alts";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "Weak SOL/Memes";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "Dead Memes";
+  return "Dead Charts";
 }
 
 function buildMovePressureLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
@@ -244,7 +250,7 @@ function buildMoveWhyLines(
   }
 
   if (result.regime !== previousResult.regime) {
-    lines.push(`Regime Flipped: ${formatCompactStateLabel(previousResult)} \u2192 ${formatCompactStateLabel(result)}`);
+    lines.push(`Mode Changed: ${formatCompactStateLabel(previousResult)} \u2192 ${formatCompactStateLabel(result)}`);
   }
 
   if (result.leader !== previousResult.leader) {
@@ -271,7 +277,7 @@ function buildMoveReadLines(result: RegimeScoreResult, guidance: ActionGuidance)
 
 function buildMoveFlipLines(result: RegimeScoreResult, guidance: ActionGuidance): string[] {
   if (result.regime === "Risk-Off" || result.regime === "Defensive") {
-    return ["BTC repair = first green light", "Score > 40 = pressure easing"];
+    return ["BTC repairs = first green light", "Risk assets confirm = confidence improves"];
   }
 
   if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") {
@@ -294,39 +300,39 @@ function buildMoveFlipLines(result: RegimeScoreResult, guidance: ActionGuidance)
 }
 
 function formatCompactStateLabel(result: RegimeScoreResult): string {
-  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
-  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
-  if (result.regime === "Neutral / Chop") return "CHOP";
-  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON \u26A1";
+  if (result.regime === "Risk-Off") return "Risk-Off \u{1F9CA}";
+  if (result.regime === "Defensive") return "Defensive \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "Chop";
+  if (result.regime === "Strong Risk-On / Rotation") return "Risk-On Rotation \u{1F680}";
   if (result.regime === "Risk-On") return formatCompactLeaderLabel(result.leader);
   return formatCompactLeaderLabel(result.leader);
 }
 
 function formatCompactLeaderLabel(leader: RegimeScoreResult["leader"]): string {
-  if (leader === "BTC-led") return "BTC WATCH \u20BF";
-  if (leader === "ETH-led") return "ETH ROTATION \u2666\uFE0F";
-  if (leader === "SOL-led") return "SOL ROTATION \u25CE";
-  if (leader === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
-  if (leader === "Mixed") return "MIXED";
-  return "ALT ROTATION";
+  if (leader === "BTC-led") return "BTC Watch \u20BF";
+  if (leader === "ETH-led") return "ETH Rotation";
+  if (leader === "SOL-led") return "SOL Rotation";
+  if (leader === "Defensive") return "Defensive \u{1F6E1}\uFE0F";
+  if (leader === "Mixed") return "Mixed";
+  return "Alt Rotation";
 }
 
 function formatPublicStateLabel(result: RegimeScoreResult): string {
-  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
-  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
-  if (result.regime === "Neutral / Chop") return "CHOP";
-  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON \u26A1";
+  if (result.regime === "Risk-Off") return "Risk-Off \u{1F9CA}";
+  if (result.regime === "Defensive") return "Defensive \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "Chop";
+  if (result.regime === "Strong Risk-On / Rotation") return "Risk-On Rotation \u{1F680}";
   if (result.regime === "Risk-On") return formatLeaderLabel(result.leader);
   return formatLeaderLabel(result.leader);
 }
 
 function formatLeaderLabel(leader: RegimeScoreResult["leader"]): string {
-  if (leader === "BTC-led") return "BTC WATCH \u20BF";
-  if (leader === "ETH-led") return "ETH ROTATION \u2666\uFE0F";
-  if (leader === "SOL-led") return "SOL ROTATION \u25CE";
-  if (leader === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
-  if (leader === "Mixed") return "MIXED";
-  return "ALT ROTATION";
+  if (leader === "BTC-led") return "BTC Watch \u20BF";
+  if (leader === "ETH-led") return "ETH Rotation";
+  if (leader === "SOL-led") return "SOL Rotation";
+  if (leader === "Defensive") return "Defensive \u{1F6E1}\uFE0F";
+  if (leader === "Mixed") return "Mixed";
+  return "Alt Rotation";
 }
 
 function isRotationLeader(leader: RegimeScoreResult["leader"]): boolean {
@@ -363,38 +369,42 @@ function labeledLines(fields: Array<[string, string]>): string[] {
   return fields.map(([label, value]) => labeledLine(label, value));
 }
 
+function optionalLabeledRow(label: string, value: string | undefined): Array<[string, string]> {
+  return value ? [[label, value]] : [];
+}
+
 function labeledLine(label: string, value: string): string {
   return `<b>${escapeHtml(label)}:</b>${value ? ` ${escapeHtml(value)}` : ""}`;
 }
 
 
 function premiumModeLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
-  if (result.regime === "Risk-Off") return "RISK-OFF \u{1F9CA}";
-  if (result.regime === "Defensive") return "DEFENSIVE \u{1F6E1}\uFE0F";
-  if (result.regime === "Neutral / Chop") return "CHOP / WAIT \u{1F4A4}";
-  if (result.regime === "Strong Risk-On / Rotation") return "RISK-ON, PICKY \u26A1";
+  if (result.regime === "Risk-Off") return "Risk-Off \u{1F9CA}";
+  if (result.regime === "Defensive") return "Defensive \u{1F6E1}\uFE0F";
+  if (result.regime === "Neutral / Chop") return "Chop / Wait";
+  if (result.regime === "Strong Risk-On / Rotation") return "Risk-On Rotation \u{1F680}";
 
   if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") {
-    return "BTC WATCH \u20BF";
+    return "BTC Watch \u20BF";
   }
   if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") {
-    return "ETH ROTATION \u2666\uFE0F";
+    return "ETH Rotation";
   }
   if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") {
-    return "SOL ROTATION \u25CE";
+    return "SOL Rotation";
   }
 
-  return "RISK-ON, PICKY \u26A1";
+  return "Risk-On Rotation \u{1F680}";
 }
 
 function premiumHoldNowLabel(result: RegimeScoreResult, guidance: ActionGuidance): string {
-  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Mostly Stables \u{1F6E1}\uFE0F";
-  if (result.regime === "Neutral / Chop") return "Wait / Stables \u{1F4A4}";
-  if (result.regime === "Strong Risk-On / Rotation") return "Leading Rotation \u26A1";
-  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC Favored \u20BF";
-  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH Favored \u2666\uFE0F";
-  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL Favored \u25CE";
-  return "Leading Rotation \u26A1";
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Mostly Stables";
+  if (result.regime === "Neutral / Chop") return "Wait / Stables";
+  if (result.regime === "Strong Risk-On / Rotation") return "Leading Rotation";
+  if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC Favored";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH Favored";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL Favored";
+  return "Leading Rotation";
 }
 
 function premiumPulseWatchLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
@@ -442,7 +452,7 @@ function premiumMoveReadLines(result: RegimeScoreResult, guidance: ActionGuidanc
 }
 
 function premiumPulseFlipSignal(result: RegimeScoreResult, guidance: ActionGuidance): string {
-  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "BTC repair = risk can reopen";
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "BTC repairs + risk assets confirm";
   if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return "Clear leader = lane opens";
   if (guidance.action === "BTC WATCH" || guidance.action === "BTC FOCUS" || result.leader === "BTC-led") return "BTC fails = back to stables";
   if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH/BTC holds = ETH confirms";
@@ -568,18 +578,24 @@ function heatRows(result: RegimeScoreResult): Array<[string, string]> {
   return [["Heat", heat.publicLabel]];
 }
 
-function defiLine(result: RegimeScoreResult): string {
+function defiLine(result: RegimeScoreResult): string | undefined {
   const defiStatus = result.defiConfirmation?.status ?? "Unavailable";
   switch (defiStatus) {
     case "Strong":
-      return "Strong \u{1F30A}";
+      return "Healthy \u{1F30A}";
     case "Mixed":
-      return "Mixed \u{1F32B}\uFE0F";
+      return "Mixed";
     case "Weak":
       return "Weak \u{1F9CA}";
     case "Unavailable":
-      return "Unavailable \u26AA";
+      return undefined;
   }
+}
+
+function regimeConfidenceLabel(value: RegimeConfidence): string {
+  if (value === "Confirmed") return "Confirmed \u2705";
+  if (value === "Noisy") return "Noisy \u26A0\uFE0F";
+  return "Caution";
 }
 
 export function buildTempoTapeContext(
@@ -601,6 +617,138 @@ export function buildTempoTapeContext(
     tempo: `${phase} \u2022 ${activityState}`,
     tapeState
   };
+}
+
+export function deriveRegimeConfidence(
+  result: RegimeScoreResult,
+  previousResult?: RegimeScoreResult | null,
+  tempoContext?: TempoTapeContext
+): RegimeConfidence {
+  const context = tempoContext ?? buildTempoTapeContext(result, previousResult);
+  const btcScore = componentScore(result, "BTC trend / structure");
+  const ethBtcScore = componentScore(result, "ETH/BTC relative strength");
+  const solBtcScore = componentScore(result, "SOL/BTC relative strength");
+  const solEthScore = componentScore(result, "SOL/ETH relative strength");
+  const participation = summarizeParticipation([ethBtcScore, solBtcScore, solEthScore]);
+  const activity = result.defiConfirmation?.status ?? "Unavailable";
+  const btcSupports = regimeBtcSupport(result, btcScore);
+  const participationSupports = regimeParticipationSupport(result, participation, ethBtcScore, solBtcScore, solEthScore);
+  const participationContradicts = regimeParticipationContradiction(result, participation);
+  const activitySupports = regimeActivitySupport(result, activity);
+  const activityContradicts = regimeActivityContradiction(result, activity);
+  const noisySession = isNoisySession(context);
+  const changedRecently = Boolean(
+    previousResult &&
+      (previousResult.regime !== result.regime || previousResult.leader !== result.leader || Math.abs(result.score - previousResult.score) >= 10)
+  );
+  const stronglyConfirmed = btcSupports && participationSupports && activitySupports;
+
+  let regimeConfidence: RegimeConfidence;
+  if (btcSupports && participationSupports && !activityContradicts) {
+    regimeConfidence = "Confirmed";
+  } else if (!btcSupports || participationContradicts || activityContradicts) {
+    regimeConfidence = "Noisy";
+  } else {
+    regimeConfidence = "Caution";
+  }
+
+  if (regimeConfidence === "Confirmed" && noisySession && !stronglyConfirmed) {
+    regimeConfidence = "Caution";
+  }
+
+  if (regimeConfidence === "Caution" && noisySession && changedRecently && (!btcSupports || participationContradicts || activityContradicts)) {
+    regimeConfidence = "Noisy";
+  }
+
+  return regimeConfidence;
+}
+
+function componentScore(result: RegimeScoreResult, name: string): number {
+  return result.components.find((component) => component.name === name)?.score ?? 0;
+}
+
+function summarizeParticipation(scores: number[]): { total: number; bullishVotes: number; bearishVotes: number } {
+  return {
+    total: scores.reduce((sum, score) => sum + score, 0),
+    bullishVotes: scores.filter((score) => score >= 4).length,
+    bearishVotes: scores.filter((score) => score <= -4).length
+  };
+}
+
+function regimeBtcSupport(result: RegimeScoreResult, btcScore: number): boolean {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return btcScore <= -8;
+  if (result.regime === "Neutral / Chop") return btcScore > -8 && btcScore < 8;
+  return btcScore >= 8;
+}
+
+function regimeParticipationSupport(
+  result: RegimeScoreResult,
+  participation: { total: number; bullishVotes: number; bearishVotes: number },
+  ethBtcScore: number,
+  solBtcScore: number,
+  solEthScore: number
+): boolean {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") {
+    return participation.bearishVotes >= 2 || (participation.total <= -8 && participation.bullishVotes === 0);
+  }
+
+  if (result.regime === "Neutral / Chop") {
+    return (participation.bullishVotes > 0 && participation.bearishVotes > 0) || Math.abs(participation.total) <= 6;
+  }
+
+  if (result.leader === "ETH-led") {
+    return ethBtcScore > 0 && (participation.bullishVotes >= 2 || participation.total >= 6);
+  }
+
+  if (result.leader === "SOL-led") {
+    return solBtcScore > 0 && solEthScore > 0;
+  }
+
+  if (result.leader === "BTC-led") {
+    return participation.bullishVotes >= 1 && participation.total >= 0;
+  }
+
+  return participation.bullishVotes >= 2 && participation.total >= 8;
+}
+
+function regimeParticipationContradiction(
+  result: RegimeScoreResult,
+  participation: { total: number; bullishVotes: number; bearishVotes: number }
+): boolean {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") {
+    return participation.bullishVotes >= 2 && participation.total >= 6;
+  }
+
+  if (result.regime === "Neutral / Chop") {
+    return (participation.bullishVotes >= 2 && participation.total >= 8) || (participation.bearishVotes >= 2 && participation.total <= -8);
+  }
+
+  return participation.bearishVotes >= 2 && participation.total <= -6;
+}
+
+function regimeActivitySupport(result: RegimeScoreResult, activity: string): boolean {
+  if (activity === "Unavailable") return false;
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return activity === "Weak";
+  if (result.regime === "Neutral / Chop") return activity === "Mixed";
+  return activity === "Strong";
+}
+
+function regimeActivityContradiction(result: RegimeScoreResult, activity: string): boolean {
+  if (activity === "Unavailable") return false;
+  if (result.regime === "Neutral / Chop") return false;
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return false;
+  return activity === "Weak";
+}
+
+function isNoisySession(context: TempoTapeContext): boolean {
+  return (
+    context.sessionPhase.startsWith("Weekend") ||
+    context.activityState === "chop risk high" ||
+    context.activityState === "watch fake moves" ||
+    context.activityState === "thin liquidity" ||
+    context.activityState === "liquidity thinning" ||
+    context.activityState === "activity slowing"
+  );
 }
 
 interface SessionContext {

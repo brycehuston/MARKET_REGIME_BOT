@@ -79,6 +79,8 @@ export interface RegimeScoreResult {
   derivativesHeat?: DerivativesHeatSnapshot;
 }
 
+export type RegimeConfidence = "Confirmed" | "Caution" | "Noisy";
+
 export type ActionMode =
   | "STAY IN STABLES"
   | "WAIT / MOSTLY STABLES"
@@ -103,6 +105,7 @@ export interface ActionGuidance {
 export interface AccuracySnapshotFields {
   actionMode: ActionMode;
   confidence: string;
+  regimeConfidence: RegimeConfidence;
   defiStatus: DefiConfirmationStatus;
   derivativesHeatStatus: DerivativesHeatStatus;
   derivativesHeatLabel: string;

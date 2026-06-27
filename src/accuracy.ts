@@ -23,6 +23,7 @@ interface AccuracySnapshot {
   leader: string;
   actionMode: string;
   confidence: string;
+  regimeConfidence: string;
   defiStatus: string;
   derivativesHeatStatus: string;
   derivativesHeatLabel: string;
@@ -43,6 +44,7 @@ interface AccuracyResult {
   leader: string;
   score: number | null;
   confidence: string;
+  regimeConfidence: string;
   defiStatus: string;
   derivativesHeatStatus: string;
   derivativesHeatLabel: string;
@@ -142,6 +144,7 @@ function normalizeSnapshot(raw: Record<string, unknown>): AccuracySnapshot | nul
     leader,
     actionMode,
     confidence: typeof raw.confidence === "string" ? raw.confidence : "Unknown",
+    regimeConfidence: typeof raw.regimeConfidence === "string" ? raw.regimeConfidence : "Unknown",
     defiStatus: normalizeDefiStatus(raw.defiStatus, raw.defiConfirmation),
     derivativesHeatStatus: typeof raw.derivativesHeatStatus === "string" ? raw.derivativesHeatStatus : "Unavailable",
     derivativesHeatLabel: typeof raw.derivativesHeatLabel === "string" ? raw.derivativesHeatLabel : "Unavailable ?",
@@ -255,6 +258,7 @@ function buildAccuracyResult(source: AccuracySnapshot, future: AccuracySnapshot,
     leader: source.leader,
     score: source.score,
     confidence: source.confidence,
+    regimeConfidence: source.regimeConfidence,
     defiStatus: source.defiStatus,
     derivativesHeatStatus: source.derivativesHeatStatus,
     derivativesHeatLabel: source.derivativesHeatLabel,
@@ -349,6 +353,7 @@ function writeResultsCsv(filePath: string, results: AccuracyResult[]): void {
     "leader",
     "score",
     "confidence",
+    "regime_confidence",
     "defi_status",
     "derivatives_heat_status",
     "derivatives_heat_label",
@@ -371,6 +376,7 @@ function writeResultsCsv(filePath: string, results: AccuracyResult[]): void {
     result.leader,
     result.score,
     result.confidence,
+    result.regimeConfidence,
     result.defiStatus,
     result.derivativesHeatStatus,
     result.derivativesHeatLabel,
@@ -393,6 +399,7 @@ function printSummary(results: AccuracyResult[]): void {
   console.log("");
   printAccuracyGroup("Accuracy by action mode", results, (result) => result.actionMode);
   printAccuracyGroup("Accuracy by regime", results, (result) => result.regime);
+  printAccuracyGroup("Accuracy by regime confidence", results, (result) => result.regimeConfidence);
   printAccuracyGroup("Accuracy by DeFi confirmation status", results, (result) => result.defiStatus);
   printAverageReturns(results);
   printBestWorstActionMode(results);

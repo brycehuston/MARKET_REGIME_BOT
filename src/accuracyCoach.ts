@@ -21,6 +21,7 @@ interface CoachSnapshot {
   normalizedActionMode: string;
   score: number | null;
   confidence: string;
+  regimeConfidence: string;
   regime: string;
   leader: string;
   defiStatus: string;
@@ -55,6 +56,7 @@ interface CoachEvaluation {
   leader: string;
   score: number | null;
   confidence: string;
+  regimeConfidence: string;
   defiStatus: string;
   derivativesHeatStatus: string;
   sessionBucket: string;
@@ -96,6 +98,7 @@ interface CoachReport {
   };
   byActionMode: BreakdownRow[];
   byRegime: BreakdownRow[];
+  byRegimeConfidence: BreakdownRow[];
   byDefiStatus: BreakdownRow[];
   bySessionBucket: BreakdownRow[];
   assetWinners: Record<AssetWinner, number>;
@@ -210,6 +213,7 @@ function normalizeSnapshot(raw: Record<string, unknown>): CoachSnapshot | null {
     normalizedActionMode: normalizeActionMode(actionMode),
     score: finiteNumber(raw.score),
     confidence: stringValue(raw.confidence, "Unknown"),
+    regimeConfidence: stringValue(raw.regimeConfidence, "Unknown"),
     regime: stringValue(raw.regime, "Unknown"),
     leader: stringValue(raw.leader, "Unknown"),
     defiStatus: normalizeDefiStatus(raw.defiStatus, raw.defiConfirmation),
@@ -290,6 +294,7 @@ function buildEvaluation(source: CoachSnapshot, future: CoachSnapshot, window: W
     leader: source.leader,
     score: source.score,
     confidence: source.confidence,
+    regimeConfidence: source.regimeConfidence,
     defiStatus: source.defiStatus,
     derivativesHeatStatus: source.derivativesHeatStatus,
     sessionBucket: sessionBucket(source.timestampMs),
@@ -383,6 +388,7 @@ function buildReport(summary: LoadSummary, evaluations: CoachEvaluation[]): Coac
     ...row,
     note: row.evaluatedCount < 5 ? "sample size is tiny" : undefined
   }));
+  const byRegimeConfidence = breakdown(evaluations, (evaluation) => evaluation.regimeConfidence);
   const byDefiStatus = breakdown(evaluations, (evaluation) => evaluation.defiStatus).map((row) => ({
     ...row,
     insight: defiInsight(row, evaluations.filter((evaluation) => evaluation.defiStatus === row.key))
@@ -409,6 +415,7 @@ function buildReport(summary: LoadSummary, evaluations: CoachEvaluation[]): Coac
     },
     byActionMode,
     byRegime,
+    byRegimeConfidence,
     byDefiStatus,
     bySessionBucket,
     assetWinners,
@@ -521,10 +528,11 @@ function printReport(report: CoachReport): void {
 
   printBreakdown("3. Best/worst action modes", report.byActionMode);
   printBreakdown("4. Regime breakdown", report.byRegime);
-  printBreakdown("5. DeFi breakdown", report.byDefiStatus, true);
-  printBreakdown("6. Session/vibe breakdown", report.bySessionBucket);
+  printBreakdown("5. Regime confidence breakdown", report.byRegimeConfidence);
+  printBreakdown("6. DeFi breakdown", report.byDefiStatus, true);
+  printBreakdown("7. Session/vibe breakdown", report.bySessionBucket);
 
-  console.log("7. Asset winner table");
+  console.log("8. Asset winner table");
   for (const asset of ["STABLES", "BTC", "ETH", "SOL"] as AssetWinner[]) {
     console.log(`- ${asset}: ${report.assetWinners[asset]}`);
   }
@@ -537,11 +545,11 @@ function printReport(report: CoachReport): void {
     console.log("");
   }
 
-  console.log("8. Coach notes");
+  console.log("9. Coach notes");
   for (const note of report.coachNotes) console.log(`- ${note}`);
   console.log("");
 
-  console.log("9. Suggested next experiments");
+  console.log("10. Suggested next experiments");
   for (const experiment of report.suggestedNextExperiments) console.log(`- ${experiment}`);
   console.log("");
 
@@ -706,6 +714,7 @@ function writeEvaluationsCsv(filePath: string, evaluations: CoachEvaluation[]): 
     "leader",
     "score",
     "confidence",
+    "regimeConfidence",
     "defiStatus",
     "derivativesHeatStatus",
     "sessionBucket",
@@ -730,6 +739,7 @@ function writeEvaluationsCsv(filePath: string, evaluations: CoachEvaluation[]): 
     evaluation.leader,
     evaluation.score,
     evaluation.confidence,
+    evaluation.regimeConfidence,
     evaluation.defiStatus,
     evaluation.derivativesHeatStatus,
     evaluation.sessionBucket,
