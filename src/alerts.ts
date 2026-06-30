@@ -1,52 +1,75 @@
-import { AlertDecision, BotConfig, RegimeScoreResult, SavedState } from "./types";
+import { AlertDecision, BotConfig, RegimeConfidence, RegimeScoreResult, SavedState } from "./types";
 
-export function decideAlert(config: BotConfig, state: SavedState, result: RegimeScoreResult): AlertDecision {
+export function decideAlert(
+  config: BotConfig,
+  state: SavedState,
+  result: RegimeScoreResult,
+  currentConfidence: RegimeConfidence,
+  previousConfidence: RegimeConfidence | null
+): AlertDecision {
   if (!config.alertRules.enabled) {
     return { shouldSend: false, reason: "Alerts disabled in config.", isCritical: false };
   }
 
   if (state.lastScore === null || state.lastRegime === null) {
     return {
-      shouldSend: config.alertRules.sendStartupAlert,
-      reason: config.alertRules.sendStartupAlert ? "First run / startup snapshot." : "First run saved silently.",
+      shouldSend: false,
+      reason: "No market move: first scan baseline saved.",
       isCritical: false
     };
   }
 
-  const scoreDelta = Math.abs(result.score - state.lastScore);
-  const regimeChanged = result.regime !== state.lastRegime;
-  const leaderChanged = result.leader !== state.lastLeader;
-  const meaningfulScoreChange = scoreDelta >= config.alertRules.minScoreDelta;
-  const critical = regimeChanged || crossesMajorRiskBoundary(state.lastScore, result.score);
+  const previousScore = state.lastScore;
+  const currentScore = result.score;
+  const previousMode = state.lastRegime;
+  const currentMode = result.regime;
+  const scoreDelta = currentScore - previousScore;
+  const boundaryCross = crossedRegimeBoundary(previousScore, currentScore);
 
-  if (!regimeChanged && !meaningfulScoreChange && !leaderChanged) {
+  if (boundaryCross) {
     return {
-      shouldSend: false,
-      reason: `No major change. Score delta ${scoreDelta}, regime still ${result.regime}.`,
+      shouldSend: true,
+      reason: boundaryCross,
+      isCritical: currentMode === "Risk-Off" || previousMode === "Risk-Off"
+    };
+  }
+
+  if (currentMode !== previousMode) {
+    return {
+      shouldSend: true,
+      reason: `Mode changed ${previousMode} -> ${currentMode}`,
+      isCritical: currentMode === "Risk-Off" || previousMode === "Risk-Off"
+    };
+  }
+
+  if (scoreDelta <= -3) {
+    return {
+      shouldSend: true,
+      reason: `Score dropped ${previousScore} -> ${currentScore}`,
+      isCritical: currentMode === "Risk-Off"
+    };
+  }
+
+  if (scoreDelta >= 5) {
+    return {
+      shouldSend: true,
+      reason: `Score rose ${previousScore} -> ${currentScore}`,
       isCritical: false
     };
   }
 
-  const lastAlertAgeMinutes = minutesSince(state.lastAlertAt);
-  const cooldown = critical ? config.alertRules.criticalCooldownMinutes : config.alertRules.cooldownMinutes;
-
-  if (lastAlertAgeMinutes !== null && lastAlertAgeMinutes < cooldown) {
+  if (isMarketMoveConfidenceChange(previousConfidence, currentConfidence)) {
     return {
-      shouldSend: false,
-      reason: `Cooldown active. Last alert was ${Math.round(lastAlertAgeMinutes)} minutes ago.`,
-      isCritical: critical
+      shouldSend: true,
+      reason: `Confidence changed ${previousConfidence} -> ${currentConfidence}`,
+      isCritical: currentConfidence !== "Confirmed"
     };
   }
-
-  const reasons: string[] = [];
-  if (regimeChanged) reasons.push(`Regime changed from ${state.lastRegime} to ${result.regime}`);
-  if (leaderChanged) reasons.push(`Leader changed from ${state.lastLeader ?? "unknown"} to ${result.leader}`);
-  if (meaningfulScoreChange) reasons.push(`Score changed by ${scoreDelta} points (${state.lastScore} â†’ ${result.score})`);
 
   return {
-    shouldSend: true,
-    reason: reasons.join("; "),
-    isCritical: critical
+    shouldSend: false,
+    reason: noMarketMoveReason(previousScore, currentScore, currentMode),
+    isCritical: false
   };
 }
 
@@ -75,6 +98,39 @@ export function shouldSendTelegramHeartbeat(
   return lastHeartbeatAgeMinutes === null || lastHeartbeatAgeMinutes >= intervalMinutes;
 }
 
+function crossedRegimeBoundary(previousScore: number, currentScore: number): string | null {
+  const boundaries = [25, 45, 60, 75];
+
+  for (const boundary of boundaries) {
+    if (previousScore <= boundary && currentScore > boundary) {
+      return `Score crossed above ${boundary}`;
+    }
+
+    if (previousScore > boundary && currentScore <= boundary) {
+      return `Score crossed below ${boundary + 1}`;
+    }
+  }
+
+  return null;
+}
+
+function isMarketMoveConfidenceChange(
+  previousConfidence: RegimeConfidence | null,
+  currentConfidence: RegimeConfidence
+): boolean {
+  if (previousConfidence === null || previousConfidence === currentConfidence) return false;
+  if (previousConfidence === "Confirmed") return currentConfidence === "Caution" || currentConfidence === "Noisy";
+  return currentConfidence === "Confirmed";
+}
+
+function noMarketMoveReason(previousScore: number, currentScore: number, currentMode: string): string {
+  if (previousScore === currentScore) {
+    return `No market move: score unchanged ${currentScore} stayed within ${currentMode}`;
+  }
+
+  return `No market move: score change ${previousScore} -> ${currentScore} stayed within ${currentMode}`;
+}
+
 function currentUtcBoundaryMs(intervalMinutes: number): number | null {
   const now = new Date();
   const utcMinutes = now.getUTCMinutes();
@@ -90,14 +146,6 @@ function currentUtcBoundaryMs(intervalMinutes: number): number | null {
     0,
     0
   );
-}
-
-function crossesMajorRiskBoundary(previousScore: number, currentScore: number): boolean {
-  const wasRiskOff = previousScore <= 45;
-  const isRiskOn = currentScore >= 61;
-  const wasRiskOn = previousScore >= 61;
-  const isDefensive = currentScore <= 45;
-  return (wasRiskOff && isRiskOn) || (wasRiskOn && isDefensive);
 }
 
 function minutesSince(iso: string | null): number | null {

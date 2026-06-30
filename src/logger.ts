@@ -1,4 +1,4 @@
-import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, GlobalHistoryPoint, RegimeScoreResult, SavedState } from "./types";
+import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, GlobalHistoryPoint, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
 import { appendCsvRow, appendLine, nowIso, readJsonFile, writeJsonFile } from "./utils";
 
 export function createDefaultState(): SavedState {
@@ -226,8 +226,13 @@ export function logAlert(config: BotConfig, result: RegimeScoreResult, decision:
   );
 }
 
-export function logSnapshot(config: BotConfig, result: RegimeScoreResult, accuracyFields?: AccuracySnapshotFields): void {
-  appendLine(config.paths.snapshotJsonl, JSON.stringify({ ...result, ...accuracyFields }));
+export function logSnapshot(
+  config: BotConfig,
+  result: RegimeScoreResult,
+  accuracyFields?: AccuracySnapshotFields,
+  auditFields?: MarketMoveAuditFields
+): void {
+  appendLine(config.paths.snapshotJsonl, JSON.stringify({ ...result, ...accuracyFields, ...auditFields }));
 }
 
 export function logError(config: BotConfig, error: unknown): void {

@@ -1,4 +1,4 @@
-﻿export type Timeframe = "1h" | "4h" | "1d";
+export type Timeframe = "1h" | "4h" | "1d";
 
 export type RegimeName =
   | "Risk-Off"
@@ -134,7 +134,25 @@ export interface AccuracySnapshotFields {
   nextScanAt: string;
 }
 
+
+export interface MarketMoveAuditFields {
+  marketMoveWanted: boolean;
+  marketMoveSent: boolean;
+  marketMoveReason: string;
+  heartbeatWanted: boolean;
+  heartbeatSent: boolean;
+  telegramConfigured: boolean;
+  telegramSendError: string | null;
+  previousScore: number | null;
+  currentScore: number;
+  previousMode: RegimeName | null;
+  currentMode: RegimeName;
+  previousConfidence: RegimeConfidence | null;
+  currentConfidence: RegimeConfidence;
+}
+
 export interface SavedState {
+
   version: string;
   lastRunAt: string | null;
   lastAlertAt: string | null;
@@ -287,6 +305,3 @@ export interface MarketDataSnapshot {
   global: GlobalSnapshot;
   defiConfirmation: DefiConfirmation;
 }
-
-
-
