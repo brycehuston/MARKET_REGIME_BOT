@@ -135,6 +135,89 @@ export interface AccuracySnapshotFields {
 }
 
 
+export type BestLane = "BTC" | "ETH" | "SOL" | "STABLES" | "NO_CLEAR_LANE";
+export type LaneConfidence = "Clear" | "Mixed" | "Weak" | "Unavailable";
+export type RiskStyle = "No trade" | "Scout only" | "Hold winners" | "Add only on confirmation" | "Risk-on allowed";
+export type ChopState = "Clean" | "Mixed" | "Choppy" | "Unavailable";
+
+export interface LaneExplainerHistoryPoint {
+  timestamp: string;
+  timestampMs: number;
+  score: number | null;
+  regime: string;
+  leader: string;
+  regimeConfidence: string;
+  marketMoveReason: string | null;
+  btcPrice: number | null;
+  ethPrice: number | null;
+  solPrice: number | null;
+  ethBtcRatio: number | null;
+  solBtcRatio: number | null;
+  solEthRatio: number | null;
+  bestLane?: BestLane | string | null;
+}
+
+export interface LaneExplainerSnapshotFields {
+  bestLane: BestLane;
+  bestLaneLabel: string;
+  laneConfidence: LaneConfidence;
+  laneReason: string;
+  laneMargin: number | null;
+  laneRank1: BestLane;
+  laneRank2: BestLane;
+  laneScoreBtc: number | null;
+  laneScoreEth: number | null;
+  laneScoreSol: number | null;
+  laneScoreStables: number | null;
+  leaderPersistenceScans: number | null;
+  riskStyle: RiskStyle;
+  ifInAction: string;
+  ifFlatAction: string;
+  invalidIf: string;
+  btcRepairFlag: boolean | null;
+  timeframeRead: string;
+  shortTermState: string;
+  chopState: ChopState;
+  suppressionNote: string | null;
+  scoreFlipCount6h: number | null;
+  scoreRange6h: number | null;
+  retBtc4h: number | null;
+  retEth4h: number | null;
+  retSol4h: number | null;
+  retBtc12h: number | null;
+  retEth12h: number | null;
+  retSol12h: number | null;
+  retBtc1d: number | null;
+  retEth1d: number | null;
+  retSol1d: number | null;
+  retEthBtc4h: number | null;
+  retSolBtc4h: number | null;
+  retSolEth4h: number | null;
+  retEthBtc1d: number | null;
+  retSolBtc1d: number | null;
+  retSolEth1d: number | null;
+}
+
+export interface LaneExplainerInput {
+  timestamp: string;
+  score: number;
+  regime: RegimeName;
+  leader: LeaderName;
+  regimeConfidence: RegimeConfidence;
+  defiStatus: DefiConfirmationStatus;
+  sessionPhase: string;
+  activityState: string;
+  marketMoveReason: string | null;
+  btcPrice: number | null;
+  ethPrice: number | null;
+  solPrice: number | null;
+  ethBtcRatio: number | null;
+  solBtcRatio: number | null;
+  solEthRatio: number | null;
+  history: LaneExplainerHistoryPoint[];
+}
+
+export type LaneExplainerResult = LaneExplainerSnapshotFields;
 export interface MarketMoveAuditFields {
   marketMoveWanted: boolean;
   marketMoveSent: boolean;

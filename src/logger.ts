@@ -1,4 +1,5 @@
-import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, GlobalHistoryPoint, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
+import fs from "node:fs";
+import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, GlobalHistoryPoint, LaneExplainerHistoryPoint, LaneExplainerSnapshotFields, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
 import { appendCsvRow, appendLine, nowIso, readJsonFile, writeJsonFile } from "./utils";
 
 export function createDefaultState(): SavedState {
@@ -97,6 +98,58 @@ function parseTimestampMs(timestamp: string | null | undefined): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+export function loadLaneExplainerHistory(config: BotConfig): LaneExplainerHistoryPoint[] {
+  const filePath = config.paths.snapshotJsonl;
+  if (!fs.existsSync(filePath)) return [];
+
+  const points: LaneExplainerHistoryPoint[] = [];
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    try {
+      const raw = JSON.parse(trimmed) as Record<string, unknown>;
+      const point = normalizeLaneHistoryPoint(raw);
+      if (point) points.push(point);
+    } catch {
+      continue;
+    }
+  }
+
+  const byTimestamp = new Map<string, LaneExplainerHistoryPoint>();
+  for (const point of points) byTimestamp.set(point.timestamp, point);
+  return [...byTimestamp.values()].sort((a, b) => a.timestampMs - b.timestampMs).slice(-500);
+}
+
+function normalizeLaneHistoryPoint(raw: Record<string, unknown>): LaneExplainerHistoryPoint | null {
+  const timestamp = typeof raw.timestamp === "string" ? raw.timestamp : "";
+  const timestampMs = parseTimestampMs(timestamp);
+  if (timestampMs === null) return null;
+
+  return {
+    timestamp,
+    timestampMs,
+    score: finiteNumber(raw.score),
+    regime: typeof raw.regime === "string" ? raw.regime : "Unknown",
+    leader: typeof raw.leader === "string" ? raw.leader : "Unknown",
+    regimeConfidence: typeof raw.regimeConfidence === "string" ? raw.regimeConfidence : "Unknown",
+    marketMoveReason: typeof raw.marketMoveReason === "string" ? raw.marketMoveReason : null,
+    btcPrice: finiteNumber(raw.btcPrice),
+    ethPrice: finiteNumber(raw.ethPrice),
+    solPrice: finiteNumber(raw.solPrice),
+    ethBtcRatio: finiteNumber(raw.ethBtcRatio),
+    solBtcRatio: finiteNumber(raw.solBtcRatio),
+    solEthRatio: finiteNumber(raw.solEthRatio),
+    bestLane: typeof raw.bestLane === "string" ? raw.bestLane : null
+  };
+}
+
+function finiteNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 export function logScore(config: BotConfig, result: RegimeScoreResult): void {
   const getScore = (name: string): number => result.components.find((component) => component.name === name)?.score ?? 0;
 
@@ -230,9 +283,10 @@ export function logSnapshot(
   config: BotConfig,
   result: RegimeScoreResult,
   accuracyFields?: AccuracySnapshotFields,
-  auditFields?: MarketMoveAuditFields
+  auditFields?: MarketMoveAuditFields,
+  laneFields?: LaneExplainerSnapshotFields
 ): void {
-  appendLine(config.paths.snapshotJsonl, JSON.stringify({ ...result, ...accuracyFields, ...auditFields }));
+  appendLine(config.paths.snapshotJsonl, JSON.stringify({ ...result, ...accuracyFields, ...auditFields, ...laneFields }));
 }
 
 export function logError(config: BotConfig, error: unknown): void {

@@ -35,6 +35,14 @@ interface CoachSnapshot {
   solEthRatio: number;
 }
 
+interface LaneExplainerSummary {
+  byBestLane: Record<string, number>;
+  byLaneConfidence: Record<string, number>;
+  byRiskStyle: Record<string, number>;
+  solBestLaneCount: number;
+  note: string;
+}
+
 interface LoadSummary {
   snapshotsRead: number;
   validEnrichedSnapshots: number;
@@ -46,6 +54,7 @@ interface LoadSummary {
     end: string | null;
   };
   unknownActionModes: Record<string, number>;
+  laneExplainerSummary: LaneExplainerSummary;
 }
 
 interface CoachEvaluation {
@@ -104,6 +113,7 @@ interface CoachReport {
   assetWinners: Record<AssetWinner, number>;
   coachNotes: string[];
   suggestedNextExperiments: string[];
+  laneExplainerSummary: LaneExplainerSummary;
 }
 
 const WINDOWS: WindowSpec[] = [
@@ -135,7 +145,8 @@ function loadSnapshots(filePath: string): { snapshots: CoachSnapshot[]; summary:
     missingRequiredFieldsSkipped: 0,
     duplicateTimestampsSkipped: 0,
     dateRange: { start: null, end: null },
-    unknownActionModes: {}
+    unknownActionModes: {},
+    laneExplainerSummary: createLaneExplainerSummary()
   };
 
   if (!fs.existsSync(filePath)) return { snapshots: [], summary };
@@ -161,6 +172,7 @@ function loadSnapshots(filePath: string): { snapshots: CoachSnapshot[]; summary:
         continue;
       }
 
+      addLaneExplainerSummary(summary.laneExplainerSummary, parsed);
       byTimestamp.set(snapshot.timestamp, snapshot);
       if (snapshot.normalizedActionMode === "UNKNOWN") {
         summary.unknownActionModes[snapshot.actionMode] = (summary.unknownActionModes[snapshot.actionMode] ?? 0) + 1;
@@ -180,6 +192,30 @@ function loadSnapshots(filePath: string): { snapshots: CoachSnapshot[]; summary:
   return { snapshots, summary };
 }
 
+function createLaneExplainerSummary(): LaneExplainerSummary {
+  return {
+    byBestLane: {},
+    byLaneConfidence: {},
+    byRiskStyle: {},
+    solBestLaneCount: 0,
+    note: "Forward lane evaluation will be added in the next phase."
+  };
+}
+
+function addLaneExplainerSummary(summary: LaneExplainerSummary, raw: Record<string, unknown>): void {
+  const bestLane = stringValue(raw.bestLane, "Unavailable");
+  const laneConfidence = stringValue(raw.laneConfidence, "Unavailable");
+  const riskStyle = stringValue(raw.riskStyle, "Unavailable");
+
+  increment(summary.byBestLane, bestLane);
+  increment(summary.byLaneConfidence, laneConfidence);
+  increment(summary.byRiskStyle, riskStyle);
+  if (bestLane === "SOL") summary.solBestLaneCount += 1;
+}
+
+function increment(record: Record<string, number>, key: string): void {
+  record[key] = (record[key] ?? 0) + 1;
+}
 function normalizeSnapshot(raw: Record<string, unknown>): CoachSnapshot | null {
   const timestamp = typeof raw.timestamp === "string" ? raw.timestamp : "";
   const timestampMs = new Date(timestamp).getTime();
@@ -420,7 +456,8 @@ function buildReport(summary: LoadSummary, evaluations: CoachEvaluation[]): Coac
     bySessionBucket,
     assetWinners,
     coachNotes: coachNotes(evaluations, byActionMode, byDefiStatus, assetWinners, smallSampleWarning),
-    suggestedNextExperiments: suggestedNextExperiments(evaluations)
+    suggestedNextExperiments: suggestedNextExperiments(evaluations),
+    laneExplainerSummary: summary.laneExplainerSummary
   };
 }
 
@@ -532,6 +569,8 @@ function printReport(report: CoachReport): void {
   printBreakdown("6. DeFi breakdown", report.byDefiStatus, true);
   printBreakdown("7. Session/vibe breakdown", report.bySessionBucket);
 
+  printLaneExplainerSummary(report.laneExplainerSummary);
+
   console.log("8. Asset winner table");
   for (const asset of ["STABLES", "BTC", "ETH", "SOL"] as AssetWinner[]) {
     console.log(`- ${asset}: ${report.assetWinners[asset]}`);
@@ -556,6 +595,24 @@ function printReport(report: CoachReport): void {
   console.log(`Output files: ${REPORT_JSON}, ${EVALUATIONS_CSV}`);
 }
 
+function printLaneExplainerSummary(summary: LaneExplainerSummary): void {
+  console.log("Lane Explainer Summary");
+  printCountRecord("- bestLane", summary.byBestLane);
+  printCountRecord("- laneConfidence", summary.byLaneConfidence);
+  printCountRecord("- riskStyle", summary.byRiskStyle);
+  console.log(`- SOL bestLane count: ${summary.solBestLaneCount}`);
+  console.log(`- ${summary.note}`);
+  console.log("");
+}
+
+function printCountRecord(label: string, record: Record<string, number>): void {
+  const entries = Object.entries(record).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (entries.length === 0) {
+    console.log(`${label}: none`);
+    return;
+  }
+  console.log(`${label}: ${entries.map(([key, count]) => `${key} ${count}`).join(" | ")}`);
+}
 function printBreakdown(title: string, rows: BreakdownRow[], includeInsight = false): void {
   console.log(title);
   if (rows.length === 0) {

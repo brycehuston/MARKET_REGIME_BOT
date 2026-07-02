@@ -5,9 +5,11 @@ import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
 import { buildRatioCandles } from "./indicators";
 import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
+import { deriveLaneExplainer } from "./laneExplainer";
 import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
 import {
+  loadLaneExplainerHistory,
   loadState,
   logAlert,
   logDerivativesHeat,
@@ -73,6 +75,24 @@ export class MarketRegimeBot {
       const currentConfidence = deriveRegimeConfidence(result, state.currentResult);
       const decision = decideAlert(this.config, state, result, currentConfidence, previousConfidence);
       const accuracyFields = this.buildAccuracySnapshotFields(snapshot.candles, result, guidance, state.currentResult, nextScanIso);
+      const laneExplainer = deriveLaneExplainer({
+        timestamp: result.timestamp,
+        score: result.score,
+        regime: result.regime,
+        leader: result.leader,
+        regimeConfidence: currentConfidence,
+        defiStatus: accuracyFields.defiStatus,
+        sessionPhase: accuracyFields.sessionPhase,
+        activityState: accuracyFields.activityState,
+        marketMoveReason: decision.reason,
+        btcPrice: accuracyFields.btcPrice,
+        ethPrice: accuracyFields.ethPrice,
+        solPrice: accuracyFields.solPrice,
+        ethBtcRatio: accuracyFields.ethBtcRatio,
+        solBtcRatio: accuracyFields.solBtcRatio,
+        solEthRatio: accuracyFields.solEthRatio,
+        history: loadLaneExplainerHistory(this.config)
+      });
 
       logScore(this.config, result);
       logDerivativesHeat(this.config, result.derivativesHeat);
@@ -90,7 +110,7 @@ export class MarketRegimeBot {
           console.log("Telegram alert wanted, but TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.");
         } else {
           try {
-            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult));
+            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer));
             telegramSent = true;
           } catch (error) {
             // Alert delivery should not stop the bot from saving state/logs.
@@ -102,7 +122,7 @@ export class MarketRegimeBot {
         }
       } else if (heartbeatWanted) {
         try {
-          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult));
+          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer));
           heartbeatSent = true;
         } catch (error) {
           // Heartbeat delivery should not stop the bot from saving state/logs.
@@ -125,7 +145,7 @@ export class MarketRegimeBot {
         previousConfidence,
         currentConfidence
       );
-      logSnapshot(this.config, result, accuracyFields, auditFields);
+      logSnapshot(this.config, result, accuracyFields, auditFields, laneExplainer);
 
       const nextState = updateStateAfterRun(state, result, decision, heartbeatSent);
       saveState(this.config, nextState);

@@ -1,4 +1,4 @@
-﻿import { ActionGuidance, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
+import { ActionGuidance, LaneExplainerResult, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
 
 const PULSE_HEADER_SEPARATOR = "\u2501".repeat(20);
 const PULSE_TITLE = "\u2022  ALPHA \u2666\uFE0F PULSE  \u2022";
@@ -57,7 +57,8 @@ export function formatRegimeAlert(
   result: RegimeScoreResult,
   alertReason: string,
   nextScanIso?: string,
-  previousResult?: RegimeScoreResult | null
+  previousResult?: RegimeScoreResult | null,
+  laneExplainer?: LaneExplainerResult
 ): string {
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
@@ -65,7 +66,8 @@ export function formatRegimeAlert(
   const nextScan = formatRelativeNextScan(nextScanIso);
   const marketActivity = defiLine(result);
   const whyLines = buildMoveWhyLines(result, previousResult, alertReason);
-  const riskBackLines = buildMoveFlipLines(result, guidance);
+  const useExplainer = shouldUseLaneExplainer(laneExplainer);
+  const riskBackLines = useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
   const lines = [
     MOVE_HEADER_SEPARATOR,
     MOVE_TITLE,
@@ -78,11 +80,19 @@ export function formatRegimeAlert(
     ...whyLines.map(([label, value]) => labeledLine(label, value)),
     "",
     labeledLine("Plan", buildMoveActionLabel(result, guidance)),
-    labeledLine("Watch", buildMoveWatchLabel(result, guidance)),
-    labeledLine("Avoid", buildMoveAvoidLabel(result, guidance)),
+    ...(useExplainer
+      ? [
+          labeledLine("Best Lane", laneExplainer.bestLaneLabel),
+          labeledLine("If In", laneExplainer.ifInAction),
+          labeledLine("If Flat", laneExplainer.ifFlatAction)
+        ]
+      : [
+          labeledLine("Watch", buildMoveWatchLabel(result, guidance)),
+          labeledLine("Avoid", buildMoveAvoidLabel(result, guidance))
+        ]),
     "",
     sectionLine("\u{1F9E0}", "Read"),
-    ...buildMoveReadLines(result, guidance).map(escapeHtml),
+    ...(useExplainer ? buildExplainerMoveReadLines(result, laneExplainer) : buildMoveReadLines(result, guidance)).map(escapeHtml),
     "",
     ...optionalLabeledRow("Market", marketActivity).map(([label, value]) => labeledLine(label, value)),
     labeledLine("Session", formatSessionLine(tempoContext)),
@@ -102,13 +112,15 @@ export function formatRegimeAlert(
 export function formatHeartbeatAlert(
   result: RegimeScoreResult,
   nextScanIso: string,
-  previousResult?: RegimeScoreResult | null
+  previousResult?: RegimeScoreResult | null,
+  laneExplainer?: LaneExplainerResult
 ): string {
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
   const marketActivity = defiLine(result);
+  const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const lines = [
     PULSE_HEADER_SEPARATOR,
     PULSE_TITLE,
@@ -118,10 +130,18 @@ export function formatHeartbeatAlert(
     labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
     "",
     treeHeaderLine("\u{1F3AF}", "Plan", premiumHoldNowLabel(result, guidance)),
-    treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
-    treeLine("\u2514\u2500", "Avoid", premiumPulseAvoidLine(result, guidance)),
+    ...(useExplainer
+      ? [
+          treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
+          treeLine("\u251C\u2500", "If In", laneExplainer.ifInAction),
+          treeLine("\u2514\u2500", "If Flat", laneExplainer.ifFlatAction)
+        ]
+      : [
+          treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
+          treeLine("\u2514\u2500", "Avoid", premiumPulseAvoidLine(result, guidance))
+        ]),
     "",
-    ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance),
+    ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined),
     "",
     treeHeaderLine("\u{1F4CA}", "Score", `${result.score}/100`),
     treeLine("\u2514\u2500", "Next Scan", nextScan),
@@ -132,6 +152,36 @@ export function formatHeartbeatAlert(
 
   return lines.join("\n");
 }
+function shouldUseLaneExplainer(laneExplainer: LaneExplainerResult | undefined): laneExplainer is LaneExplainerResult {
+  return Boolean(laneExplainer) && process.env.ALPHA_PULSE_EXPLAINER_MODE?.trim().toLowerCase() !== "false";
+}
+
+function buildExplainerMoveReadLines(result: RegimeScoreResult, laneExplainer: LaneExplainerResult): string[] {
+  if (result.regime === "Risk-Off") {
+    if (laneExplainer.bestLane === "SOL") return ["Risk is ugly.", "SOL is leading, but no fresh risk." ];
+    return ["Risk got ugly.", "Stables first until BTC repairs."];
+  }
+
+  if ((result.regime === "Defensive" || result.regime === "Neutral / Chop") && laneExplainer.bestLane === "SOL") {
+    return ["Market is messy.", "SOL is leading, but broad risk is not clean."];
+  }
+
+  if (laneExplainer.chopState === "Choppy") return ["This is chop, not a clean move.", "Wait for confirmation."];
+  if (laneExplainer.bestLane === "NO_CLEAR_LANE") return ["Market is messy.", "Wait for a cleaner lane."];
+  if (laneExplainer.bestLane === "STABLES") return ["Broad risk is not clean.", "Weak alts need proof."];
+  if (laneExplainer.bestLane === "BTC") return ["BTC is the cleanest lane.", "Alts still need proof."];
+  if (laneExplainer.bestLane === "ETH") return ["ETH is improving versus BTC.", "Watch for follow-through."];
+  return ["SOL is leading.", "Trail winners; do not chase flat."];
+}
+
+function buildExplainerRiskBackLines(laneExplainer: LaneExplainerResult): string[] {
+  if (laneExplainer.bestLane === "SOL") return ["BTC repairs = broad risk improves", "SOL loses lead = lane weakens"];
+  if (laneExplainer.bestLane === "BTC") return ["BTC holds = lane stays open", "BTC fails = back to stables"];
+  if (laneExplainer.bestLane === "ETH") return ["ETH/BTC holds = ETH confirms", "ETH/BTC fails = wait"];
+  if (laneExplainer.bestLane === "STABLES") return ["BTC repairs = first green light", "Risk assets confirm = confidence improves"];
+  return ["Clear leader = lane opens", "Score improves = risk can reopen"];
+}
+
 function buildMoveAlertLabel(result: RegimeScoreResult, previousResult: RegimeScoreResult | null | undefined): string {
   if (!previousResult) {
     return isRiskOffish(result.regime) ? "Risk-Off Pressure \u{1F9CA}" : "Major Shift \u26A0\uFE0F";
@@ -372,11 +422,16 @@ function buildPulseActivitySection(
   marketActivity: string | undefined,
   tempoContext: TempoTapeContext,
   result: RegimeScoreResult,
-  guidance: ActionGuidance
+  guidance: ActionGuidance,
+  laneExplainer?: LaneExplainerResult
 ): string[] {
   const lines = [treeHeaderLine("\u{1F30A}", "Activity", marketActivity ?? sentenceCase(tempoContext.activityState))];
   lines.push(treeLine("\u251C\u2500", "Session", formatSessionLine(tempoContext)));
-  lines.push(treeLine("\u2514\u2500", "Risk Back If", premiumPulseFlipSignal(result, guidance)));
+  if (laneExplainer) {
+    lines.push(treeLine("\u2514\u2500", "Invalid If", laneExplainer.invalidIf));
+  } else {
+    lines.push(treeLine("\u2514\u2500", "Risk Back If", premiumPulseFlipSignal(result, guidance)));
+  }
   return lines;
 }
 
