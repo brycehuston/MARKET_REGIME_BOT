@@ -1,4 +1,4 @@
-import {
+﻿import {
   BestLane,
   ChopState,
   LaneConfidence,
@@ -330,6 +330,64 @@ function persistenceScoresByLane(input: LaneExplainerInput): Map<AssetLane, numb
   return new Map<AssetLane, number>(ASSET_LANES.map((lane) => [lane, Math.min(20, persistenceCount(input, lane) * 5)]));
 }
 
+function currentLeaderPriorScores(input: LaneExplainerInput): Map<AssetLane, number> {
+  const currentLeader = currentLeaderLane(input);
+  return new Map<AssetLane, number>(ASSET_LANES.map((lane) => [lane, lane === currentLeader ? 8 : 0]));
+}
+
+function currentLeaderLane(input: LaneExplainerInput): AssetLane | null {
+  const leader = input.leader.toUpperCase();
+  if (leader.includes("SOL")) return "SOL";
+  if (leader.includes("ETH")) return "ETH";
+  if (leader.includes("BTC")) return "BTC";
+  return null;
+}
+
+function shouldApplySolConsistencyGuard(
+  input: LaneExplainerInput,
+  returns: ReturnSet,
+  assetScores: Map<AssetLane, number>,
+  rawBestLane: BestLane
+): boolean {
+  if (currentLeaderLane(input) !== "SOL") return false;
+  if (!solProxyPositive(returns)) return false;
+  if (!solWindowSupport(returns)) return false;
+  if (rawBestLane !== "ETH") return false;
+
+  const ethScore = assetScores.get("ETH");
+  const solScore = assetScores.get("SOL");
+  if (ethScore === undefined || solScore === undefined) return false;
+  return ethScore - solScore < 15;
+}
+
+function solProxyPositive(returns: ReturnSet): boolean {
+  return [returns.retSolBtc4h, returns.retSolBtc1d, returns.retSolEth4h, returns.retSolEth1d].some((value) => (value ?? 0) > 0);
+}
+
+function solWindowSupport(returns: ReturnSet): boolean {
+  return windowLeader(returns, "12h") === "SOL leading" || windowLeader(returns, "1d") === "SOL leading";
+}
+
+function strongestNonSolLane(scored: Array<{ lane: BestLane; score: number | null }>): BestLane {
+  return scored.find((item) => item.lane !== "SOL")?.lane ?? "NO_CLEAR_LANE";
+}
+
+function guardedSolMargin(assetScores: Map<AssetLane, number>, rank2Lane: BestLane): number | null {
+  const solScore = assetScores.get("SOL");
+  const rank2Score = rank2Lane === "BTC" || rank2Lane === "ETH" ? assetScores.get(rank2Lane) : null;
+  if (solScore === undefined || rank2Score === null || rank2Score === undefined) return null;
+  return round(solScore - rank2Score, 2);
+}
+
+function guardedSolConfidence(input: LaneExplainerInput): LaneConfidence {
+  if (input.regimeConfidence === "Noisy" || input.regime === "Neutral / Chop") return "Mixed";
+  if (input.regime === "Defensive") return "Mixed";
+  return "Clear";
+}
+
+function solConsistencyGuardReason(margin: number | null, persistence: number | null): string {
+  return `SOL current leader + SOL/BTC/SOL/ETH support; margin ${formatNullable(margin)}; persistence ${persistence ?? 0}`;
+}
 function deriveStablesScore(input: LaneExplainerInput, strongestAssetScore: number, returns: ReturnSet): number {
   const bestAssetReturn = Math.max(...[weightedAssetReturn("BTC", returns), weightedAssetReturn("ETH", returns), weightedAssetReturn("SOL", returns)].map((value) => value ?? -Infinity));
   if (input.regime === "Risk-Off") return strongestAssetScore >= 82 && bestAssetReturn > 2 ? 68 : 82;
