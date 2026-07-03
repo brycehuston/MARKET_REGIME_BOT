@@ -112,6 +112,7 @@ export type BacktestDataStatus = "KNOWN_AHEAD" | "REAL_TIME" | "T_PLUS_1" | "POS
 export type MacroTrend = "UNKNOWN" | "UP" | "DOWN" | "FLAT";
 export type EquityRiskState = "UNKNOWN" | "RISK_ON" | "NEUTRAL" | "RISK_OFF";
 export type VolRegime = "UNKNOWN" | "LOW" | "ELEVATED" | "STRESSED";
+export type MacroLiquidityTrend = "UNKNOWN" | "EXPANDING" | "CONTRACTING" | "FLAT";
 export type EtfFlowLagState = "UNKNOWN" | "T_PLUS_1_AVAILABLE" | "NOT_AVAILABLE";
 export type TokenUnlockRisk = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
 export type ChainStatusRisk = "NONE" | "DEGRADED" | "OUTAGE" | "UNKNOWN";
@@ -122,6 +123,27 @@ export interface MacroContext {
   realYieldTrend: MacroTrend;
   equityRiskState: EquityRiskState;
   volRegime: VolRegime;
+  tenYearYield: number | null;
+  twoYearYield: number | null;
+  tenYearRealYield: number | null;
+  vix: number | null;
+  highYieldSpread: number | null;
+  dollarProxy: number | null;
+  fredEnabled: boolean;
+  fredSourceTimestamp: string | null;
+  fredIngestTimestamp: string | null;
+  fredSeriesDates: Record<string, string | null>;
+  fredError: string | null;
+  backtestDataStatus: BacktestDataStatus;
+}
+
+export interface MacroLiquidityContext {
+  walcl: number | null;
+  rrp: number | null;
+  tga: number | null;
+  netLiquidityProxy: number | null;
+  netLiquidityTrend: MacroLiquidityTrend;
+  liquiditySourceTimestamp: string | null;
 }
 
 export interface FedContext {
@@ -162,6 +184,7 @@ export interface EventContext {
   eventContextVersion: string;
   eventContextOperational: false;
   macroContext?: MacroContext;
+  macroLiquidityContext?: MacroLiquidityContext;
   fedContext?: FedContext;
   cryptoCatalystContext?: CryptoCatalystContext;
   moonPhaseContext?: MoonPhaseContext;
@@ -323,6 +346,11 @@ export interface MarketMoveAuditFields {
   eventExpiryContext?: ExpiryContext;
   eventMarketMoveMode?: MarketMoveEventMode;
   eventContextOperational?: false;
+  fredEnabled?: boolean;
+  fredSourceTimestamp?: string | null;
+  fredIngestTimestamp?: string | null;
+  fredError?: string | null;
+  fredBacktestDataStatus?: BacktestDataStatus;
 }
 
 export interface SavedState {

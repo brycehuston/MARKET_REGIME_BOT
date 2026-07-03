@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { decideAlert } from "./alerts";
-import { buildEventContext } from "./eventContext";
+import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveBestLane } from "./laneExplainer";
 import { scoreMarketRegime } from "./scorer";
 import {
@@ -9,6 +9,8 @@ import {
   CandleBundle,
   DefiConfirmation,
   GlobalSnapshot,
+  MacroContext,
+  MacroLiquidityContext,
   RegimeScoreResult,
   SavedState
 } from "./types";
@@ -102,6 +104,21 @@ function testMoonSafety(): void {
   assert.equal(newMoon.eventRiskLevel, "LOW");
 }
 
+function testFredMacroContextSafety(): void {
+  const context = buildEventContext(utc("2026-07-10T12:00:00Z"), {
+    macroContext: fixtureMacroContext(),
+    macroLiquidityContext: fixtureMacroLiquidityContext()
+  });
+
+  assert.equal(context.eventContextOperational, false);
+  assert.equal(context.eventRiskLevel, "LOW");
+  assert.equal(context.marketMoveEventMode, "NORMAL");
+  assert.equal(context.confirmationRequirement, "NORMAL");
+  assert.equal(context.macroContext?.fredEnabled, true);
+  assert.equal(context.macroContext?.backtestDataStatus, "REAL_TIME");
+  assert.equal(context.macroLiquidityContext?.netLiquidityTrend, "EXPANDING");
+  assert.match(formatEventContextSummary(context) ?? "", /data context only; no score impact/);
+}
 function testBehaviorPreservation(): void {
   const config = fixtureConfig();
   const state = fixtureState();
@@ -109,7 +126,9 @@ function testBehaviorPreservation(): void {
   const global = fixtureGlobal();
   const scoredA = scoreMarketRegime({ timeframe: "1h", candles, global, state, config });
   buildEventContext(utc("2026-07-10T12:00:00Z"), {
-    scheduledEvents: [{ name: "CPI", type: "MACRO", impactClass: "TIER_A", scheduledUtc: "2026-07-10T12:30:00Z" }]
+    scheduledEvents: [{ name: "CPI", type: "MACRO", impactClass: "TIER_A", scheduledUtc: "2026-07-10T12:30:00Z" }],
+    macroContext: fixtureMacroContext(),
+    macroLiquidityContext: fixtureMacroLiquidityContext()
   });
   const scoredB = scoreMarketRegime({ timeframe: "1h", candles, global, state, config });
   const { timestamp: timestampA, ...scoredComparableA } = scoredA;
@@ -136,12 +155,15 @@ function testBehaviorPreservation(): void {
     solEthRatio: 1.13,
     history: []
   };
-  assert.deepEqual(deriveBestLane(laneInput), deriveBestLane(laneInput));
+  const laneA = deriveBestLane(laneInput);
+  buildEventContext(utc("2026-07-10T12:00:00Z"), { macroContext: fixtureMacroContext() });
+  const laneB = deriveBestLane(laneInput);
+  assert.deepEqual(laneB, laneA);
 
   const previous = { ...scoredA, score: scoredA.score - 10, regime: scoredA.regime } as RegimeScoreResult;
   const alertState: SavedState = { ...state, lastScore: previous.score, lastRegime: previous.regime, currentResult: previous };
   const decisionA = decideAlert(config, alertState, scoredA, "Confirmed", "Confirmed");
-  buildEventContext(utc("2026-07-10T12:00:00Z"));
+  buildEventContext(utc("2026-07-10T12:00:00Z"), { macroContext: fixtureMacroContext() });
   const decisionB = decideAlert(config, alertState, scoredA, "Confirmed", "Confirmed");
   assert.deepEqual(decisionB, decisionA);
 }
@@ -228,11 +250,45 @@ function makeCandles(symbol: string, start: number, step: number): Candle[] {
   });
 }
 
+
+function fixtureMacroContext(): MacroContext {
+  return {
+    dxyTrend: "UP",
+    tenYearYieldTrend: "UP",
+    realYieldTrend: "DOWN",
+    equityRiskState: "NEUTRAL",
+    volRegime: "ELEVATED",
+    tenYearYield: 4.12,
+    twoYearYield: 3.9,
+    tenYearRealYield: 1.83,
+    vix: 24,
+    highYieldSpread: 3.8,
+    dollarProxy: 125.2,
+    fredEnabled: true,
+    fredSourceTimestamp: "2026-07-02",
+    fredIngestTimestamp: "2026-07-03T12:00:00.000Z",
+    fredSeriesDates: { DGS10: "2026-07-02" },
+    fredError: null,
+    backtestDataStatus: "REAL_TIME"
+  };
+}
+
+function fixtureMacroLiquidityContext(): MacroLiquidityContext {
+  return {
+    walcl: 7000,
+    rrp: 500,
+    tga: 800,
+    netLiquidityProxy: 5700,
+    netLiquidityTrend: "EXPANDING",
+    liquiditySourceTimestamp: "2026-07-02"
+  };
+}
 testDefaultSafety();
 testTierAWindows();
 testTierBAndStacking();
 testCalendarLiquidity();
 testMoonSafety();
+testFredMacroContextSafety();
 testBehaviorPreservation();
 
 console.log("EventContext tests passed.");
