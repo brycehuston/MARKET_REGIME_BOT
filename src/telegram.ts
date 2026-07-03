@@ -1,13 +1,10 @@
 import { formatEventContextSummary } from "./eventContext";
 import { ActionGuidance, EventContext, LaneExplainerResult, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
 
-const PULSE_HEADER_SEPARATOR = "\u2501".repeat(20);
-const PULSE_TITLE = "\u2022  ALPHA \u2666\uFE0F PULSE  \u2022";
-const PULSE_FOOTER_SEPARATOR = "\u2501".repeat(22);
-const MOVE_HEADER_SEPARATOR = "\u2501".repeat(23);
-const MOVE_TITLE = "\u2022 \u{1F50E} MARKET MOVE \u{1F50D} \u2022";
-const MOVE_FOOTER_SEPARATOR = "\u2501".repeat(25);
+const ALERT_SEPARATOR = "\u2501".repeat(22);
+const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
 const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01";
+const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD"]);
 export interface TempoTapeContext {
   sessionPhase: string;
   sessionElapsedMinutes: number | null;
@@ -70,45 +67,48 @@ export function formatRegimeAlert(
   const whyLines = buildMoveWhyLines(result, previousResult, alertReason);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
+  const contextRows = splitContextRows(eventContextSummary);
   const riskBackLines = useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
+  const scoreDelta = previousResult ? result.score - previousResult.score : null;
+  const marketMoveEmoji = selectMarketMoveHeaderEmoji(scoreDelta, isCriticalMarketMove(result, previousResult));
+  const whyIcon = scoreDelta !== null && scoreDelta > 0 ? "\u{1F4C8}" : scoreDelta !== null && scoreDelta < 0 ? "\u{1F4C9}" : "\u26A1";
   const lines = [
-    MOVE_HEADER_SEPARATOR,
-    MOVE_TITLE,
-    MOVE_HEADER_SEPARATOR,
+    ...formatHeader("MARKET", marketMoveEmoji, "MOVE"),
     "",
     labeledLine("Alert", buildMoveAlertLabel(result, previousResult)),
     labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
     "",
-    sectionLine("\u{1F4C9}", "Why It Fired"),
-    ...whyLines.map(([label, value]) => labeledLine(label, value)),
+    sectionLine(whyIcon, "Why It Fired"),
+    ...formatTreeRows(whyLines),
     "",
-    labeledLine("Plan", buildMoveActionLabel(result, guidance)),
+    treeHeaderLine("\u{1F3AF}", "Plan", buildMoveActionLabel(result, guidance)),
     ...(useExplainer
-      ? [
-          labeledLine("Best Lane", laneExplainer.bestLaneLabel),
-          labeledLine("If In", laneExplainer.ifInAction),
-          labeledLine("If Flat", laneExplainer.ifFlatAction),
-          ...optionalLabeledRow("Context", eventContextSummary).map(([label, value]) => labeledLine(label, value))
-        ]
-      : [
-          labeledLine("Watch", buildMoveWatchLabel(result, guidance)),
-          labeledLine("Avoid", buildMoveAvoidLabel(result, guidance)),
-          ...optionalLabeledRow("Context", eventContextSummary).map(([label, value]) => labeledLine(label, value))
-        ]),
+      ? formatTreeRows([
+          ["Best Lane", laneExplainer.bestLaneLabel],
+          ["If In", laneExplainer.ifInAction],
+          ["If Flat", laneExplainer.ifFlatAction],
+          ...contextRows
+        ])
+      : formatTreeRows([
+          ["Watch", buildMoveWatchLabel(result, guidance)],
+          ["Avoid", buildMoveAvoidLabel(result, guidance)],
+          ...contextRows
+        ])),
     "",
     sectionLine("\u{1F9E0}", "Read"),
-    ...(useExplainer ? buildExplainerMoveReadLines(result, laneExplainer) : buildMoveReadLines(result, guidance)).map(escapeHtml),
+    ...formatTreeRows((useExplainer ? buildExplainerMoveReadLines(result, laneExplainer) : buildMoveReadLines(result, guidance)).map((line) => [null, line])),
     "",
-    ...optionalLabeledRow("Market", marketActivity).map(([label, value]) => labeledLine(label, value)),
-    labeledLine("Session", formatSessionLine(tempoContext)),
-    labeledLine("Pressure", buildMovePressureLabel(result, guidance, tempoContext)),
-    labeledLine("Next Scan", nextScan),
+    treeHeaderLine("\u{1F30A}", "Market", marketActivity ?? sentenceCase(tempoContext.activityState)),
+    ...formatTreeRows([
+      ["Session", formatSessionLine(tempoContext)],
+      ["Pressure", buildMovePressureLabel(result, guidance, tempoContext)],
+      ["Next Scan", nextScan]
+    ]),
     "",
     sectionLine("\u2705", "Risk Back If"),
-    ...riskBackLines.map(escapeHtml),
+    ...formatTreeRows(riskBackLines.map((line) => [null, line])),
     "",
-    MOVE_FOOTER_SEPARATOR,
-    FOOTER
+    ...formatFooter()
   ];
 
   return lines.join("\n");
@@ -128,10 +128,9 @@ export function formatHeartbeatAlert(
   const marketActivity = defiLine(result);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
+  const contextRows = splitContextRows(eventContextSummary);
   const lines = [
-    PULSE_HEADER_SEPARATOR,
-    PULSE_TITLE,
-    PULSE_HEADER_SEPARATOR,
+    ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
     "",
     labeledLine("Mode", premiumModeLabel(result, guidance)),
     labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
@@ -141,13 +140,11 @@ export function formatHeartbeatAlert(
       ? [
           treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
           treeLine("\u251C\u2500", "If In", laneExplainer.ifInAction),
-          treeLine(eventContextSummary ? "\u251C\u2500" : "\u2514\u2500", "If Flat", laneExplainer.ifFlatAction),
-          ...optionalTreeContextLine(eventContextSummary)
+          ...formatTreeRows([["If Flat", laneExplainer.ifFlatAction], ...contextRows])
         ]
       : [
           treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
-          treeLine(eventContextSummary ? "\u251C\u2500" : "\u2514\u2500", "Avoid", premiumPulseAvoidLine(result, guidance)),
-          ...optionalTreeContextLine(eventContextSummary)
+          ...formatTreeRows([["Avoid", premiumPulseAvoidLine(result, guidance)], ...contextRows])
         ]),
     "",
     ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined),
@@ -155,11 +152,83 @@ export function formatHeartbeatAlert(
     treeHeaderLine("\u{1F4CA}", "Score", `${result.score}/100`),
     treeLine("\u2514\u2500", "Next Scan", nextScan),
     "",
-    PULSE_FOOTER_SEPARATOR,
-    FOOTER
+    ...formatFooter()
   ];
 
   return lines.join("\n");
+}
+
+export function formatHeader(leftTitle: string, emoji: string, rightTitle?: string): string[] {
+  const title = rightTitle ? `${leftTitle} ${emoji} ${rightTitle}` : `${leftTitle} ${emoji}`;
+  return [ALERT_SEPARATOR, `\u2022  <b>${escapeHtml(title)}</b>  \u2022`, ALERT_SEPARATOR];
+}
+
+export function formatFooter(): string[] {
+  return [ALERT_SEPARATOR, FOOTER];
+}
+
+function formatTreeRows(rows: Array<[string | null, string]>): string[] {
+  return rows.map(([label, value], index) => {
+    const branch = index === rows.length - 1 ? "\u2514\u2500" : "\u251C\u2500";
+    return label ? treeLine(branch, label, value) : `${branch} ${escapeHtml(titleCaseDisplay(value))}`;
+  });
+}
+
+export function titleCaseDisplay(value: string): string {
+  if (!value) return value;
+
+  return value
+    .split(/(\s+)/)
+    .map((part) => titleCaseDisplayToken(part))
+    .join("");
+}
+
+export function selectMarketMoveHeaderEmoji(scoreDelta: number | null | undefined, urgentOrBigMove = false): string {
+  if (urgentOrBigMove) return "\u{1F6A8}";
+  if (typeof scoreDelta === "number" && Number.isFinite(scoreDelta) && Math.abs(scoreDelta) >= MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD) return "\u{1F6A8}";
+  if (typeof scoreDelta === "number" && scoreDelta > 0) return "\u{1F4C8}";
+  if (typeof scoreDelta === "number" && scoreDelta < 0) return "\u{1F4C9}";
+  return "\u26A1";
+}
+
+function splitContextRows(summary: string | null | undefined): Array<[string, string]> {
+  if (!summary) return [];
+
+  return summary
+    .split(" | ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part): [string, string] => {
+      const separatorIndex = part.indexOf(":");
+      if (separatorIndex <= 0) return ["Context Only", stripContextOnlySuffix(part)];
+      const rawLabel = part.slice(0, separatorIndex).trim();
+      const rawValue = part.slice(separatorIndex + 1).trim();
+      if (rawLabel === "Expiry") return ["Expiry", rawValue];
+      return ["Context Only", stripContextOnlySuffix(part)];
+    });
+}
+
+function stripContextOnlySuffix(value: string): string {
+  return value.replace(/\s+-\s+context only$/i, "").trim();
+}
+
+function titleCaseDisplayToken(token: string): string {
+  if (!/[A-Za-z]/.test(token)) return token;
+  if (/^https?:\/\//i.test(token) || /^0x[0-9a-f]+$/i.test(token) || /[@_]/.test(token) || /\d/.test(token)) return token;
+
+  return token.replace(/[A-Za-z][A-Za-z']*/g, (word) => {
+    const upper = word.toUpperCase();
+    if (DISPLAY_ACRONYMS.has(upper)) return upper;
+    if (upper === "RISK") return "Risk";
+    if (upper === "ON") return "On";
+    if (upper === "OFF") return "Off";
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
+function isCriticalMarketMove(result: RegimeScoreResult, previousResult: RegimeScoreResult | null | undefined): boolean {
+  if (!previousResult) return false;
+  return result.regime === "Risk-Off" || previousResult.regime === "Risk-Off";
 }
 function shouldUseLaneExplainer(laneExplainer: LaneExplainerResult | undefined): laneExplainer is LaneExplainerResult {
   return Boolean(laneExplainer) && process.env.ALPHA_PULSE_EXPLAINER_MODE?.trim().toLowerCase() !== "false";
@@ -403,20 +472,8 @@ export function getActionGuidance(result: RegimeScoreResult): ActionGuidance {
   return applyDefiGuidance(getBaseActionGuidance(result), result);
 }
 
-function labeledLines(fields: Array<[string, string]>): string[] {
-  return fields.map(([label, value]) => labeledLine(label, value));
-}
-
-function optionalLabeledRow(label: string, value: string | null | undefined): Array<[string, string]> {
-  return value ? [[label, value]] : [];
-}
-
-function optionalTreeContextLine(value: string | null | undefined): string[] {
-  return value ? [treeLine("\u2514\u2500", "Context", value)] : [];
-}
-
 function labeledLine(label: string, value: string): string {
-  return `<b>${escapeHtml(label)}:</b>${value ? ` ${escapeHtml(value)}` : ""}`;
+  return `<b>${escapeHtml(label)}:</b>${value ? ` ${escapeHtml(titleCaseDisplay(value))}` : ""}`;
 }
 
 function sectionLine(icon: string, label: string): string {
@@ -424,11 +481,11 @@ function sectionLine(icon: string, label: string): string {
 }
 
 function treeHeaderLine(icon: string, label: string, value: string): string {
-  return `${icon} <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`;
+  return `${icon} <b>${escapeHtml(label)}:</b> ${escapeHtml(titleCaseDisplay(value))}`;
 }
 
 function treeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, value: string): string {
-  return `${branch} <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`;
+  return `${branch} <b>${escapeHtml(label)}:</b> ${escapeHtml(titleCaseDisplay(value))}`;
 }
 
 function buildPulseActivitySection(
