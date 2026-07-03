@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { BinanceProvider, BybitProvider, CoinGeckoProvider } from "./providers";
 import { DefiLlamaProvider } from "./defillama";
 import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
+import { FredContextProvider } from "./fred";
 import { buildRatioCandles } from "./indicators";
 import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
@@ -44,6 +45,7 @@ export class MarketRegimeBot {
   private readonly coingecko = new CoinGeckoProvider(this.config);
   private readonly defiLlama = new DefiLlamaProvider(this.config);
   private readonly derivativesHeat = new CoinalyzeDerivativesHeatProvider(this.config);
+  private readonly fred = new FredContextProvider();
   private readonly telegram = new TelegramClient();
 
   async runOnce(): Promise<void> {
@@ -72,7 +74,11 @@ export class MarketRegimeBot {
       console.log(`Derivatives heat: ${result.derivativesHeat.publicLabel}`);
 
       const guidance = getActionGuidance(result);
-      const eventContext = buildEventContext(new Date(result.timestamp));
+      const fredContext = await this.fred.getContext();
+      const eventContext = buildEventContext(new Date(result.timestamp), {
+        macroContext: fredContext.macroContext,
+        macroLiquidityContext: fredContext.macroLiquidityContext
+      });
       const nextScanIso = this.nextScanIso(new Date());
       const previousConfidence = state.currentResult ? deriveRegimeConfidence(state.currentResult, null) : null;
       const currentConfidence = deriveRegimeConfidence(result, state.currentResult);
@@ -346,7 +352,12 @@ export class MarketRegimeBot {
       eventLiquidityContext: eventContext.liquidityContext,
       eventExpiryContext: eventContext.expiryContext,
       eventMarketMoveMode: eventContext.marketMoveEventMode,
-      eventContextOperational: eventContext.eventContextOperational
+      eventContextOperational: eventContext.eventContextOperational,
+      fredEnabled: eventContext.macroContext?.fredEnabled,
+      fredSourceTimestamp: eventContext.macroContext?.fredSourceTimestamp ?? null,
+      fredIngestTimestamp: eventContext.macroContext?.fredIngestTimestamp ?? null,
+      fredError: eventContext.macroContext?.fredError ?? null,
+      fredBacktestDataStatus: eventContext.macroContext?.backtestDataStatus
     };
   }
   private buildAccuracySnapshotFields(

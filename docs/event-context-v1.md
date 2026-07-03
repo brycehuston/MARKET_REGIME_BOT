@@ -31,7 +31,9 @@ Top-level fields:
 - `eventContextVersion`: version string
 - `eventContextOperational`: always `false` in V1
 
-Optional nested fields are supported for macro, Fed, crypto catalyst, and moon phase context. The default scheduled macro/Fed calendar is intentionally empty and must be populated later only from sources knowable at or before the scan timestamp.
+Optional nested fields are supported for macro, macro liquidity, Fed, crypto catalyst, and moon phase context. The default scheduled macro/Fed calendar is intentionally empty and must be populated later only from sources knowable at or before the scan timestamp.
+
+FRED Context V1 is documented in `docs/fred-context-v1.md`. It is snapshot-only telemetry and must not affect score, lane, Market Move, alert, or suppression behavior.
 
 ## Data Timing Classes
 

@@ -24,6 +24,7 @@ export interface ScheduledEventContextInput {
 export interface EventContextBuildOptions {
   scheduledEvents?: ScheduledEventContextInput[];
   macroContext?: EventContext["macroContext"];
+  macroLiquidityContext?: EventContext["macroLiquidityContext"];
   fedContext?: EventContext["fedContext"];
   cryptoCatalystContext?: EventContext["cryptoCatalystContext"];
   newsRiskState?: EventContext["newsRiskState"];
@@ -81,6 +82,7 @@ export function buildEventContext(nowUtc: Date, options: EventContextBuildOption
     eventContextVersion: EVENT_CONTEXT_VERSION,
     eventContextOperational: false,
     macroContext: options.macroContext,
+    macroLiquidityContext: options.macroLiquidityContext,
     fedContext: options.fedContext,
     cryptoCatalystContext: options.cryptoCatalystContext,
     moonPhaseContext
@@ -116,6 +118,14 @@ export function formatEventContextSummary(eventContext: EventContext): string | 
 
   if (eventContext.moonPhaseContext?.phase) {
     parts.push(`Anomaly: ${eventContext.moonPhaseContext.phase} - research-only tag`);
+  }
+
+  if (eventContext.macroContext) {
+    if (eventContext.macroContext.fredEnabled) {
+      parts.push("Macro: FRED context available - data context only; no score impact");
+    } else {
+      parts.push("Macro: FRED unavailable - context skipped");
+    }
   }
 
   return parts.length > 0 ? parts.join(" | ") : null;
