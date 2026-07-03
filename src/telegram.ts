@@ -1,4 +1,5 @@
-import { ActionGuidance, LaneExplainerResult, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
+import { formatEventContextSummary } from "./eventContext";
+import { ActionGuidance, EventContext, LaneExplainerResult, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
 
 const PULSE_HEADER_SEPARATOR = "\u2501".repeat(20);
 const PULSE_TITLE = "\u2022  ALPHA \u2666\uFE0F PULSE  \u2022";
@@ -58,7 +59,8 @@ export function formatRegimeAlert(
   alertReason: string,
   nextScanIso?: string,
   previousResult?: RegimeScoreResult | null,
-  laneExplainer?: LaneExplainerResult
+  laneExplainer?: LaneExplainerResult,
+  eventContext?: EventContext
 ): string {
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
@@ -67,6 +69,7 @@ export function formatRegimeAlert(
   const marketActivity = defiLine(result);
   const whyLines = buildMoveWhyLines(result, previousResult, alertReason);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
+  const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const riskBackLines = useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
   const lines = [
     MOVE_HEADER_SEPARATOR,
@@ -84,11 +87,13 @@ export function formatRegimeAlert(
       ? [
           labeledLine("Best Lane", laneExplainer.bestLaneLabel),
           labeledLine("If In", laneExplainer.ifInAction),
-          labeledLine("If Flat", laneExplainer.ifFlatAction)
+          labeledLine("If Flat", laneExplainer.ifFlatAction),
+          ...optionalLabeledRow("Context", eventContextSummary).map(([label, value]) => labeledLine(label, value))
         ]
       : [
           labeledLine("Watch", buildMoveWatchLabel(result, guidance)),
-          labeledLine("Avoid", buildMoveAvoidLabel(result, guidance))
+          labeledLine("Avoid", buildMoveAvoidLabel(result, guidance)),
+          ...optionalLabeledRow("Context", eventContextSummary).map(([label, value]) => labeledLine(label, value))
         ]),
     "",
     sectionLine("\u{1F9E0}", "Read"),
@@ -113,7 +118,8 @@ export function formatHeartbeatAlert(
   result: RegimeScoreResult,
   nextScanIso: string,
   previousResult?: RegimeScoreResult | null,
-  laneExplainer?: LaneExplainerResult
+  laneExplainer?: LaneExplainerResult,
+  eventContext?: EventContext
 ): string {
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
@@ -121,6 +127,7 @@ export function formatHeartbeatAlert(
   const nextScan = formatRelativeNextScan(nextScanIso);
   const marketActivity = defiLine(result);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
+  const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const lines = [
     PULSE_HEADER_SEPARATOR,
     PULSE_TITLE,
@@ -134,11 +141,13 @@ export function formatHeartbeatAlert(
       ? [
           treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
           treeLine("\u251C\u2500", "If In", laneExplainer.ifInAction),
-          treeLine("\u2514\u2500", "If Flat", laneExplainer.ifFlatAction)
+          treeLine(eventContextSummary ? "\u251C\u2500" : "\u2514\u2500", "If Flat", laneExplainer.ifFlatAction),
+          ...optionalTreeContextLine(eventContextSummary)
         ]
       : [
           treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
-          treeLine("\u2514\u2500", "Avoid", premiumPulseAvoidLine(result, guidance))
+          treeLine(eventContextSummary ? "\u251C\u2500" : "\u2514\u2500", "Avoid", premiumPulseAvoidLine(result, guidance)),
+          ...optionalTreeContextLine(eventContextSummary)
         ]),
     "",
     ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined),
@@ -398,8 +407,12 @@ function labeledLines(fields: Array<[string, string]>): string[] {
   return fields.map(([label, value]) => labeledLine(label, value));
 }
 
-function optionalLabeledRow(label: string, value: string | undefined): Array<[string, string]> {
+function optionalLabeledRow(label: string, value: string | null | undefined): Array<[string, string]> {
   return value ? [[label, value]] : [];
+}
+
+function optionalTreeContextLine(value: string | null | undefined): string[] {
+  return value ? [treeLine("\u2514\u2500", "Context", value)] : [];
 }
 
 function labeledLine(label: string, value: string): string {

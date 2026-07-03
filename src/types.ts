@@ -81,6 +81,91 @@ export interface RegimeScoreResult {
 
 export type RegimeConfidence = "Confirmed" | "Caution" | "Noisy";
 
+export type EventRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "EXTREME";
+export type EventType =
+  | "NONE"
+  | "MACRO"
+  | "FED"
+  | "CENTRAL_BANK"
+  | "EXPIRY"
+  | "HOLIDAY"
+  | "CRYPTO_SCHEDULED"
+  | "CRYPTO_NEWS"
+  | "OUTAGE"
+  | "ANOMALY";
+export type EventImpactClass = "NONE" | "TIER_A" | "TIER_B" | "TIER_C" | "RESEARCH_ONLY";
+export type CalendarRiskState = "CLEAR" | "PRE_EVENT" | "LIVE_EVENT" | "POST_EVENT" | "STACKED_EVENTS";
+export type LiquidityContext =
+  | "NORMAL"
+  | "THIN_WEEKEND"
+  | "US_HOLIDAY"
+  | "GLOBAL_HOLIDAY"
+  | "MONTH_END"
+  | "QUARTER_END"
+  | "EXPIRY_DAY"
+  | "OUTAGE_CONTAMINATED";
+export type ExpiryContext = "NONE" | "WEEKLY_OPTIONS" | "MONTHLY_OPTIONS" | "QUARTERLY_EXPIRY" | "CME_TRANSITION";
+export type NewsRiskState = "NONE" | "LOW" | "ELEVATED" | "SEVERE" | "UNVERIFIED";
+export type ConfirmationRequirement = "NORMAL" | "ONE_CLOSE" | "TWO_SCAN" | "POST_EVENT_WAIT" | "DISABLED_WEAK_ALERTS";
+export type MarketMoveEventMode = "NORMAL" | "CAUTION" | "SUPPRESS_WEAK" | "DELAY" | "POST_EVENT_CONFIRM" | "DEFENSIVE_ONLY";
+export type BacktestDataStatus = "KNOWN_AHEAD" | "REAL_TIME" | "T_PLUS_1" | "POST_EVENT_ONLY" | "UNSAFE_FOR_BACKTEST";
+export type MacroTrend = "UNKNOWN" | "UP" | "DOWN" | "FLAT";
+export type EquityRiskState = "UNKNOWN" | "RISK_ON" | "NEUTRAL" | "RISK_OFF";
+export type VolRegime = "UNKNOWN" | "LOW" | "ELEVATED" | "STRESSED";
+export type EtfFlowLagState = "UNKNOWN" | "T_PLUS_1_AVAILABLE" | "NOT_AVAILABLE";
+export type TokenUnlockRisk = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
+export type ChainStatusRisk = "NONE" | "DEGRADED" | "OUTAGE" | "UNKNOWN";
+
+export interface MacroContext {
+  dxyTrend: MacroTrend;
+  tenYearYieldTrend: MacroTrend;
+  realYieldTrend: MacroTrend;
+  equityRiskState: EquityRiskState;
+  volRegime: VolRegime;
+}
+
+export interface FedContext {
+  blackoutWindow: boolean;
+  nextFomcEvent: string | null;
+  fedEventType: string | null;
+}
+
+export interface CryptoCatalystContext {
+  etfFlowLagState: EtfFlowLagState;
+  tokenUnlockRisk: TokenUnlockRisk;
+  chainStatusRisk: ChainStatusRisk;
+}
+
+export interface MoonPhaseContext {
+  phase: string | null;
+  daysFromFullMoon: number | null;
+  daysFromNewMoon: number | null;
+  researchOnly: true;
+}
+
+export interface EventContext {
+  eventRiskLevel: EventRiskLevel;
+  nextHighImpactEvent: string | null;
+  minutesToEvent: number | null;
+  minutesSinceEvent: number | null;
+  eventType: EventType;
+  eventImpactClass: EventImpactClass;
+  calendarRiskState: CalendarRiskState;
+  liquidityContext: LiquidityContext;
+  holidayContext: string[];
+  expiryContext: ExpiryContext;
+  newsRiskState: NewsRiskState;
+  eventSuppressionReason: string | null;
+  confirmationRequirement: ConfirmationRequirement;
+  marketMoveEventMode: MarketMoveEventMode;
+  backtestDataStatus: BacktestDataStatus;
+  eventContextVersion: string;
+  eventContextOperational: false;
+  macroContext?: MacroContext;
+  fedContext?: FedContext;
+  cryptoCatalystContext?: CryptoCatalystContext;
+  moonPhaseContext?: MoonPhaseContext;
+}
 export type ActionMode =
   | "STAY IN STABLES"
   | "WAIT / MOSTLY STABLES"
@@ -232,6 +317,12 @@ export interface MarketMoveAuditFields {
   currentMode: RegimeName;
   previousConfidence: RegimeConfidence | null;
   currentConfidence: RegimeConfidence;
+  eventRiskLevel?: EventRiskLevel;
+  eventCalendarRiskState?: CalendarRiskState;
+  eventLiquidityContext?: LiquidityContext;
+  eventExpiryContext?: ExpiryContext;
+  eventMarketMoveMode?: MarketMoveEventMode;
+  eventContextOperational?: false;
 }
 
 export interface SavedState {

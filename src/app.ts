@@ -5,6 +5,7 @@ import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
 import { buildRatioCandles } from "./indicators";
 import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
+import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveLaneExplainer } from "./laneExplainer";
 import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
@@ -27,6 +28,7 @@ import {
   MarketMoveAuditFields,
   MarketDataProviderName,
   MarketDataSnapshot,
+  EventContext,
   RegimeConfidence,
   RegimeScoreResult,
   Timeframe
@@ -70,6 +72,7 @@ export class MarketRegimeBot {
       console.log(`Derivatives heat: ${result.derivativesHeat.publicLabel}`);
 
       const guidance = getActionGuidance(result);
+      const eventContext = buildEventContext(new Date(result.timestamp));
       const nextScanIso = this.nextScanIso(new Date());
       const previousConfidence = state.currentResult ? deriveRegimeConfidence(state.currentResult, null) : null;
       const currentConfidence = deriveRegimeConfidence(result, state.currentResult);
@@ -110,7 +113,7 @@ export class MarketRegimeBot {
           console.log("Telegram alert wanted, but TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.");
         } else {
           try {
-            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer));
+            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer, eventContext));
             telegramSent = true;
           } catch (error) {
             // Alert delivery should not stop the bot from saving state/logs.
@@ -122,7 +125,7 @@ export class MarketRegimeBot {
         }
       } else if (heartbeatWanted) {
         try {
-          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer));
+          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer, eventContext));
           heartbeatSent = true;
         } catch (error) {
           // Heartbeat delivery should not stop the bot from saving state/logs.
@@ -143,14 +146,15 @@ export class MarketRegimeBot {
         heartbeatWanted,
         heartbeatSent,
         previousConfidence,
-        currentConfidence
+        currentConfidence,
+        eventContext
       );
-      logSnapshot(this.config, result, accuracyFields, auditFields, laneExplainer);
+      logSnapshot(this.config, result, accuracyFields, auditFields, laneExplainer, eventContext);
 
       const nextState = updateStateAfterRun(state, result, decision, heartbeatSent);
       saveState(this.config, nextState);
 
-      this.printHeartbeat(result, decision, telegramConfigured, telegramSent, heartbeatWanted, heartbeatSent, nextScanIso);
+      this.printHeartbeat(result, decision, telegramConfigured, telegramSent, heartbeatWanted, heartbeatSent, nextScanIso, eventContext);
     } catch (error) {
       logError(this.config, error);
       throw error;
@@ -320,7 +324,8 @@ export class MarketRegimeBot {
     heartbeatWanted: boolean,
     heartbeatSent: boolean,
     previousConfidence: RegimeConfidence | null,
-    currentConfidence: RegimeConfidence
+    currentConfidence: RegimeConfidence,
+    eventContext: EventContext
   ): MarketMoveAuditFields {
     return {
       marketMoveWanted: decision.shouldSend,
@@ -335,7 +340,13 @@ export class MarketRegimeBot {
       previousMode: state.lastRegime,
       currentMode: result.regime,
       previousConfidence,
-      currentConfidence
+      currentConfidence,
+      eventRiskLevel: eventContext.eventRiskLevel,
+      eventCalendarRiskState: eventContext.calendarRiskState,
+      eventLiquidityContext: eventContext.liquidityContext,
+      eventExpiryContext: eventContext.expiryContext,
+      eventMarketMoveMode: eventContext.marketMoveEventMode,
+      eventContextOperational: eventContext.eventContextOperational
     };
   }
   private buildAccuracySnapshotFields(
@@ -408,8 +419,11 @@ export class MarketRegimeBot {
     telegramSent: boolean,
     heartbeatWanted: boolean,
     heartbeatSent: boolean,
-    nextScanIso: string
+    nextScanIso: string,
+    eventContext: EventContext
   ): void {
+
+    const eventSummary = formatEventContextSummary(eventContext) ?? "Clear - context only";
 
     console.log(
       [
@@ -440,6 +454,8 @@ export class MarketRegimeBot {
         `Heartbeat wanted: ${heartbeatWanted ? "yes" : "no"}`,
         `Heartbeat sent: ${heartbeatSent ? "yes" : "no"}`,
         `Market Move reason: ${decision.reason}`,
+        `Event context: ${eventSummary}`,
+        `Event context operational: ${eventContext.eventContextOperational ? "yes" : "no"}`,
         `Next scan: ${nextScanIso}`,
         "====================================================",
         ""

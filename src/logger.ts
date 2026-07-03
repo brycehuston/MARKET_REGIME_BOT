@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, GlobalHistoryPoint, LaneExplainerHistoryPoint, LaneExplainerSnapshotFields, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
+import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, EventContext, GlobalHistoryPoint, LaneExplainerHistoryPoint, LaneExplainerSnapshotFields, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
 import { appendCsvRow, appendLine, nowIso, readJsonFile, writeJsonFile } from "./utils";
 
 export function createDefaultState(): SavedState {
@@ -284,9 +284,30 @@ export function logSnapshot(
   result: RegimeScoreResult,
   accuracyFields?: AccuracySnapshotFields,
   auditFields?: MarketMoveAuditFields,
-  laneFields?: LaneExplainerSnapshotFields
+  laneFields?: LaneExplainerSnapshotFields,
+  eventContext?: EventContext
 ): void {
-  appendLine(config.paths.snapshotJsonl, JSON.stringify({ ...result, ...accuracyFields, ...auditFields, ...laneFields }));
+  appendLine(config.paths.snapshotJsonl, JSON.stringify({
+    ...result,
+    ...accuracyFields,
+    ...auditFields,
+    ...laneFields,
+    eventContext,
+    eventRiskLevel: eventContext?.eventRiskLevel,
+    eventType: eventContext?.eventType,
+    eventImpactClass: eventContext?.eventImpactClass,
+    eventCalendarRiskState: eventContext?.calendarRiskState,
+    eventLiquidityContext: eventContext?.liquidityContext,
+    eventHolidayContext: eventContext?.holidayContext,
+    eventExpiryContext: eventContext?.expiryContext,
+    eventNewsRiskState: eventContext?.newsRiskState,
+    eventMarketMoveMode: eventContext?.marketMoveEventMode,
+    eventConfirmationRequirement: eventContext?.confirmationRequirement,
+    eventBacktestDataStatus: eventContext?.backtestDataStatus,
+    eventContextOperational: eventContext?.eventContextOperational,
+    moonPhase: eventContext?.moonPhaseContext?.phase ?? null,
+    moonResearchOnly: eventContext?.moonPhaseContext?.researchOnly ?? true
+  }));
 }
 
 export function logError(config: BotConfig, error: unknown): void {
