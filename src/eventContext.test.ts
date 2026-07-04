@@ -276,11 +276,29 @@ function fixtureMacroContext(): MacroContext {
 function fixtureMacroLiquidityContext(): MacroLiquidityContext {
   return {
     walcl: 7000,
+    walclPrior: 6900,
     rrp: 500,
-    tga: 800,
-    netLiquidityProxy: 5700,
+    rrpPrior: 550,
+    tga: 790,
+    tgaFred: 800,
+    tgaFredPrior: 750,
+    tgaFiscalData: 790,
+    tgaFiscalDataPrior: 760,
+    tgaFiscalDataTrend: "EXPANDING",
+    tgaFiscalDataRecordDate: "2026-07-02",
+    tgaFiscalDataPriorRecordDate: "2026-07-01",
+    netLiquidityProxy: 5710,
     netLiquidityTrend: "EXPANDING",
-    liquiditySourceTimestamp: "2026-07-02"
+    liquiditySourceTimestamp: "2026-07-02",
+    treasuryEnabled: true,
+    treasurySourceTimestamp: "2026-07-02",
+    treasuryIngestTimestamp: "2026-07-03T12:00:00.000Z",
+    treasuryError: null,
+    treasuryBacktestDataStatus: "REAL_TIME",
+    treasurySeriesDates: { operating_cash_balance: "2026-07-02" },
+    tgaPreferredSource: "TREASURY_FISCALDATA",
+    liquidityUnits: "USD_MILLIONS",
+    netLiquidityUnitWarning: null
   };
 }
 testDefaultSafety();

@@ -128,6 +128,18 @@ export function formatEventContextSummary(eventContext: EventContext): string | 
     }
   }
 
+  if (eventContext.macroLiquidityContext) {
+    if (eventContext.macroLiquidityContext.treasuryEnabled) {
+      parts.push("Liquidity: Treasury FiscalData available - TGA context only; no score impact");
+    } else if (eventContext.macroLiquidityContext.treasuryError) {
+      parts.push("Liquidity: Treasury FiscalData unavailable - context skipped");
+    }
+
+    if (eventContext.macroLiquidityContext.netLiquidityProxy !== null) {
+      parts.push("Liquidity: Net liquidity proxy available - telemetry only");
+    }
+  }
+
   return parts.length > 0 ? parts.join(" | ") : null;
 }
 

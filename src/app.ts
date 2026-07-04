@@ -3,6 +3,7 @@ import { BinanceProvider, BybitProvider, CoinGeckoProvider } from "./providers";
 import { DefiLlamaProvider } from "./defillama";
 import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
 import { FredContextProvider } from "./fred";
+import { TreasuryFiscalDataProvider, mergeTreasuryLiquidityContext } from "./treasury";
 import { buildRatioCandles } from "./indicators";
 import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
@@ -46,6 +47,7 @@ export class MarketRegimeBot {
   private readonly defiLlama = new DefiLlamaProvider(this.config);
   private readonly derivativesHeat = new CoinalyzeDerivativesHeatProvider(this.config);
   private readonly fred = new FredContextProvider();
+  private readonly treasury = new TreasuryFiscalDataProvider();
   private readonly telegram = new TelegramClient();
 
   async runOnce(): Promise<void> {
@@ -74,10 +76,14 @@ export class MarketRegimeBot {
       console.log(`Derivatives heat: ${result.derivativesHeat.publicLabel}`);
 
       const guidance = getActionGuidance(result);
-      const fredContext = await this.fred.getContext();
+      const [fredContext, treasuryContext] = await Promise.all([
+        this.fred.getContext(),
+        this.treasury.getContext()
+      ]);
+      const macroLiquidityContext = mergeTreasuryLiquidityContext(fredContext.macroLiquidityContext, treasuryContext);
       const eventContext = buildEventContext(new Date(result.timestamp), {
         macroContext: fredContext.macroContext,
-        macroLiquidityContext: fredContext.macroLiquidityContext
+        macroLiquidityContext
       });
       const nextScanIso = this.nextScanIso(new Date());
       const previousConfidence = state.currentResult ? deriveRegimeConfidence(state.currentResult, null) : null;
@@ -357,7 +363,12 @@ export class MarketRegimeBot {
       fredSourceTimestamp: eventContext.macroContext?.fredSourceTimestamp ?? null,
       fredIngestTimestamp: eventContext.macroContext?.fredIngestTimestamp ?? null,
       fredError: eventContext.macroContext?.fredError ?? null,
-      fredBacktestDataStatus: eventContext.macroContext?.backtestDataStatus
+      fredBacktestDataStatus: eventContext.macroContext?.backtestDataStatus,
+      treasuryEnabled: eventContext.macroLiquidityContext?.treasuryEnabled,
+      treasurySourceTimestamp: eventContext.macroLiquidityContext?.treasurySourceTimestamp ?? null,
+      treasuryIngestTimestamp: eventContext.macroLiquidityContext?.treasuryIngestTimestamp ?? null,
+      treasuryError: eventContext.macroLiquidityContext?.treasuryError ?? null,
+      treasuryBacktestDataStatus: eventContext.macroLiquidityContext?.treasuryBacktestDataStatus
     };
   }
   private buildAccuracySnapshotFields(

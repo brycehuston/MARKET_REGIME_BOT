@@ -184,11 +184,29 @@ function buildSnapshot(input: {
     },
     macroLiquidityContext: {
       walcl: roundedValue(input.results.walcl.latest),
+      walclPrior: roundedValue(input.results.walcl.prior),
       rrp: roundedValue(input.results.rrp.latest),
+      rrpPrior: roundedValue(input.results.rrp.prior),
       tga: roundedValue(input.results.tga.latest),
+      tgaFred: roundedValue(input.results.tga.latest),
+      tgaFredPrior: roundedValue(input.results.tga.prior),
+      tgaFiscalData: null,
+      tgaFiscalDataPrior: null,
+      tgaFiscalDataTrend: "UNKNOWN",
+      tgaFiscalDataRecordDate: null,
+      tgaFiscalDataPriorRecordDate: null,
       netLiquidityProxy: netLiquidity === null ? null : round(netLiquidity, 2),
       netLiquidityTrend: classifyNetLiquidityTrend(netLiquidity, priorNetLiquidity),
-      liquiditySourceTimestamp: latestSourceDate({ walcl: input.results.walcl, rrp: input.results.rrp, tga: input.results.tga })
+      liquiditySourceTimestamp: latestSourceDate({ walcl: input.results.walcl, rrp: input.results.rrp, tga: input.results.tga }),
+      treasuryEnabled: false,
+      treasurySourceTimestamp: null,
+      treasuryIngestTimestamp: null,
+      treasuryError: null,
+      treasuryBacktestDataStatus: "REAL_TIME",
+      treasurySeriesDates: {},
+      tgaPreferredSource: roundedValue(input.results.tga.latest) === null ? "NONE" : "FRED_WTREGEN",
+      liquidityUnits: "USD_MILLIONS",
+      netLiquidityUnitWarning: null
     }
   };
 }
