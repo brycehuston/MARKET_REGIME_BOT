@@ -42,9 +42,9 @@ FRED context is attached under:
 
 - `eventContext.macroContext`
 - `eventContext.macroLiquidityContext`
-- flattened snapshot fields including `fredEnabled`, `fredSourceTimestamp`, `fredIngestTimestamp`, `fredError`, `fredBacktestDataStatus`, `fredSeriesDates`, `fredNetLiquidityProxy`, and `fredNetLiquidityTrend`
+- flattened snapshot fields including `fredEnabled`, `fredSourceTimestamp`, `fredIngestTimestamp`, `fredError`, `fredBacktestDataStatus`, `fredSeriesDates`, `fredNetLiquidityProxy`, `fredNetLiquidityTrend`, `netLiquidityProxy`, and `netLiquidityTrend`
 
-The macro context includes latest values, simple latest-vs-prior trends, FRED source dates, ingest timestamp, and error telemetry. The liquidity context includes `walcl`, `rrp`, `tga`, and `netLiquidityProxy = walcl - rrp - tga` only when all three values are available.
+The macro context includes latest values, simple latest-vs-prior trends, FRED source dates, ingest timestamp, and error telemetry. The liquidity context includes `walcl`, `rrp`, `tgaFred`, `tga`, and net-liquidity telemetry. When Treasury FiscalData is unavailable, `tga` remains the FRED `WTREGEN` fallback and `netLiquidityProxy = walcl - rrp - tgaFred` only when all three values are available. When Treasury FiscalData is available and unit-compatible, Treasury is the preferred TGA source for display/proxy telemetry; FRED remains stored separately as `tgaFred`.
 
 ## Failure Behavior
 

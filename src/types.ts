@@ -113,6 +113,8 @@ export type MacroTrend = "UNKNOWN" | "UP" | "DOWN" | "FLAT";
 export type EquityRiskState = "UNKNOWN" | "RISK_ON" | "NEUTRAL" | "RISK_OFF";
 export type VolRegime = "UNKNOWN" | "LOW" | "ELEVATED" | "STRESSED";
 export type MacroLiquidityTrend = "UNKNOWN" | "EXPANDING" | "CONTRACTING" | "FLAT";
+export type TgaSource = "TREASURY_FISCALDATA" | "FRED_WTREGEN" | "NONE";
+export type LiquidityUnits = "USD_MILLIONS" | "UNKNOWN";
 export type EtfFlowLagState = "UNKNOWN" | "T_PLUS_1_AVAILABLE" | "NOT_AVAILABLE";
 export type TokenUnlockRisk = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
 export type ChainStatusRisk = "NONE" | "DEGRADED" | "OUTAGE" | "UNKNOWN";
@@ -139,11 +141,29 @@ export interface MacroContext {
 
 export interface MacroLiquidityContext {
   walcl: number | null;
+  walclPrior: number | null;
   rrp: number | null;
+  rrpPrior: number | null;
   tga: number | null;
+  tgaFred: number | null;
+  tgaFredPrior: number | null;
+  tgaFiscalData: number | null;
+  tgaFiscalDataPrior: number | null;
+  tgaFiscalDataTrend: MacroLiquidityTrend;
+  tgaFiscalDataRecordDate: string | null;
+  tgaFiscalDataPriorRecordDate: string | null;
   netLiquidityProxy: number | null;
   netLiquidityTrend: MacroLiquidityTrend;
   liquiditySourceTimestamp: string | null;
+  treasuryEnabled: boolean;
+  treasurySourceTimestamp: string | null;
+  treasuryIngestTimestamp: string | null;
+  treasuryError: string | null;
+  treasuryBacktestDataStatus: BacktestDataStatus;
+  treasurySeriesDates: Record<string, string | null>;
+  tgaPreferredSource: TgaSource;
+  liquidityUnits: LiquidityUnits;
+  netLiquidityUnitWarning: string | null;
 }
 
 export interface FedContext {
@@ -351,6 +371,11 @@ export interface MarketMoveAuditFields {
   fredIngestTimestamp?: string | null;
   fredError?: string | null;
   fredBacktestDataStatus?: BacktestDataStatus;
+  treasuryEnabled?: boolean;
+  treasurySourceTimestamp?: string | null;
+  treasuryIngestTimestamp?: string | null;
+  treasuryError?: string | null;
+  treasuryBacktestDataStatus?: BacktestDataStatus;
 }
 
 export interface SavedState {

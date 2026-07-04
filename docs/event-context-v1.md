@@ -33,7 +33,7 @@ Top-level fields:
 
 Optional nested fields are supported for macro, macro liquidity, Fed, crypto catalyst, and moon phase context. The default scheduled macro/Fed calendar is intentionally empty and must be populated later only from sources knowable at or before the scan timestamp.
 
-FRED Context V1 is documented in `docs/fred-context-v1.md`. It is snapshot-only telemetry and must not affect score, lane, Market Move, alert, or suppression behavior.
+FRED Context V1 is documented in `docs/fred-context-v1.md`. Treasury FiscalData Context V1 is documented in `docs/treasury-context-v1.md`. Both are snapshot-only telemetry and must not affect score, lane, Market Move, alert, or suppression behavior.
 
 ## Data Timing Classes
 
@@ -43,7 +43,7 @@ FRED Context V1 is documented in `docs/fred-context-v1.md`. It is snapshot-only 
 - `POST_EVENT_ONLY`: data not safely available until after the event.
 - `UNSAFE_FOR_BACKTEST`: data that would create lookahead risk if used in backtests.
 
-Leakage rule: Alpha Pulse may only use context that was knowable at or before the scan timestamp. Future Accuracy Coach analysis must group by timing class before drawing conclusions.
+Leakage rule: Alpha Pulse may only use context that was knowable at or before the scan timestamp. Treasury FiscalData analysis must use stored source timestamps, ingest timestamps, and record dates from live snapshots; do not backfill later-published FiscalData into older scans. Future Accuracy Coach analysis must group by timing class before drawing conclusions.
 
 ## Moon Policy
 
