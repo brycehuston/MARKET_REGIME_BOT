@@ -8,10 +8,10 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
 - Current Branch: `feat/event-context-relevance-policy-v1`
-- Last Known Good Commit: `aa723b8`
-- Current Objective: Establish this ops ledger as the fallback reference point for project state, progress, safety, validation, blockers, and next actions.
+- Last Known Good Commit: `9f52763`
+- Current Objective: Merge and deploy EventContext relevance policy, then verify live relevance-policy snapshot fields.
 - Current Phase: Phase 3 - Macro/event/news context layer.
-- Current Blocker: Worktree had unrelated dirty `src/*` files before this ledger setup; commit is skipped until that work is resolved or committed separately.
+- Current Blocker: None. EventContext relevance policy and ops ledger updates are committed on `feat/event-context-relevance-policy-v1`.
 - Next Best Action: Merge `feat/event-context-relevance-policy-v1` into `main`, push `main`, deploy to VPS, restart `market-regime-bot` only, and verify relevance-policy snapshot fields.
 - Last Validation: 2026-07-05 - `./node_modules/.bin/tsc.cmd -p tsconfig.json --noEmit` passed.
 - Safety Mode: `LIVE_DISABLED` / alert-only. No live trading, wallets, swaps, transaction sending, private keys, or execution paths.
@@ -88,14 +88,7 @@ Progress Rules:
 
 ## Blockers
 
-- Pre-existing unrelated dirty files before ledger setup:
-  - `src/eventContext.test.ts`
-  - `src/eventContext.ts`
-  - `src/eventContextAccuracyReport.ts`
-  - `src/logger.ts`
-  - `src/telegram.test.ts`
-  - `src/types.ts`
-- Because the worktree was already dirty, this ledger task should not be committed until those changes are handled separately.
+- None. Prior dirty source files were committed as EventContext relevance policy in 7cd8ff6; ledger files were committed in a723b8 and updated in 9f52763.
 
 ## Validation Status
 
@@ -104,21 +97,10 @@ Progress Rules:
 
 ## Next Exact Action
 
-Merge `feat/event-context-relevance-policy-v1` into `main`, push `main`, deploy to VPS, restart `market-regime-bot` only, and verify `displayRelevantEvents`, `hiddenObservedEventsCount`, `eventStackCount`, `btcHalvingContext`, and moon research-only behavior in live snapshots.
+Merge eat/event-context-relevance-policy-v1 into main, push main, deploy to VPS, restart market-regime-bot only, and verify displayRelevantEvents, hiddenObservedEventsCount, eventStackCount, tcHalvingContext, and moon research-only behavior in live snapshots.
 
 
-## Task History Update
+## Ledger Correction After EventContext Relevance Policy
 
-- 2026-07-05: EventContext relevance policy was committed as `7cd8ff6` and ops ledger was committed as `aa723b8` on `feat/event-context-relevance-policy-v1`. Feature branch is pushed and ready for fast-forward merge to `main`.
-
-## Validation Update
-
-- 2026-07-05: EventContext relevance policy validation passed before commit:
-  - `.\node_modules\.bin\tsx.cmd src\eventContext.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\telegram.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\fred.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\treasury.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\eventContextAccuracyReport.test.ts`
-  - `npm.cmd run event-context:accuracy`
-  - `npm.cmd run build`
+- 2026-07-05: Corrected stale ledger blocker/next-action wording after `9f52763`. Feature branch is ready for fast-forward merge to `main`.
 
