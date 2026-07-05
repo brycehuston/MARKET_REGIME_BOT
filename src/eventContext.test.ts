@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { decideAlert } from "./alerts";
 import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveBestLane } from "./laneExplainer";
+import { logSnapshot } from "./logger";
 import { scoreMarketRegime } from "./scorer";
 import {
   BotConfig,
   Candle,
   CandleBundle,
   DefiConfirmation,
+  EventContext,
   GlobalSnapshot,
   MacroContext,
   MacroLiquidityContext,
@@ -94,6 +99,8 @@ function testMoonSafety(): void {
   const fullMoon = buildEventContext(utc("2026-07-29T12:00:00Z"));
   assert.equal(fullMoon.moonPhaseContext?.researchOnly, true);
   assert.equal(fullMoon.moonPhaseContext?.phase, "Full moon");
+  assert.equal(fullMoon.eventType, "NONE");
+  assert.equal(fullMoon.eventImpactClass, "NONE");
   assert.equal(fullMoon.eventRiskLevel, "LOW");
   assert.equal(fullMoon.marketMoveEventMode, "NORMAL");
   assert.equal(fullMoon.confirmationRequirement, "NORMAL");
@@ -101,9 +108,23 @@ function testMoonSafety(): void {
   const newMoon = buildEventContext(utc("2026-07-14T12:00:00Z"));
   assert.equal(newMoon.moonPhaseContext?.researchOnly, true);
   assert.equal(newMoon.moonPhaseContext?.phase, "New moon");
+  assert.equal(newMoon.eventType, "NONE");
+  assert.equal(newMoon.eventImpactClass, "NONE");
   assert.equal(newMoon.eventRiskLevel, "LOW");
 }
 
+function testMissingEventSourceDataDoesNotCrash(): void {
+  const context = buildEventContext(utc("2026-07-10T12:00:00Z"), {
+    scheduledEvents: [
+      { name: "CPI", type: "MACRO", impactClass: "TIER_A", scheduledUtc: "not-a-date" }
+    ]
+  });
+
+  assert.equal(context.eventRiskLevel, "LOW");
+  assert.equal(context.eventType, "NONE");
+  assert.equal(context.calendarRiskState, "CLEAR");
+  assert.equal(context.marketMoveEventMode, "NORMAL");
+}
 function testFredMacroContextSafety(): void {
   const context = buildEventContext(utc("2026-07-10T12:00:00Z"), {
     macroContext: fixtureMacroContext(),
@@ -168,6 +189,61 @@ function testBehaviorPreservation(): void {
   assert.deepEqual(decisionB, decisionA);
 }
 
+function testSnapshotAuditRowsIncludeEventContextFields(): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "event-context-test-"));
+  const snapshotJsonl = path.join(dir, "regime_snapshots.jsonl");
+  const baseConfig = fixtureConfig();
+  const config: BotConfig = {
+    ...baseConfig,
+    paths: { ...baseConfig.paths, snapshotJsonl }
+  };
+  const scored = scoreMarketRegime({
+    timeframe: "1h",
+    candles: fixtureCandles(),
+    global: fixtureGlobal(),
+    state: fixtureState(),
+    config
+  });
+  const eventContext = buildEventContext(utc("2026-07-10T11:45:00Z"), {
+    scheduledEvents: [{ name: "CPI", type: "MACRO", impactClass: "TIER_A", scheduledUtc: "2026-07-10T12:30:00Z" }]
+  });
+  const auditFields = {
+    marketMoveWanted: false,
+    marketMoveSent: false,
+    marketMoveReason: "No market move",
+    heartbeatWanted: true,
+    heartbeatSent: false,
+    telegramConfigured: false,
+    telegramSendError: null,
+    previousScore: 50,
+    currentScore: scored.score,
+    previousMode: "Neutral / Chop" as const,
+    currentMode: scored.regime,
+    previousConfidence: "Confirmed" as const,
+    currentConfidence: "Confirmed" as const,
+    eventRiskLevel: eventContext.eventRiskLevel,
+    eventCalendarRiskState: eventContext.calendarRiskState,
+    eventLiquidityContext: eventContext.liquidityContext,
+    eventExpiryContext: eventContext.expiryContext,
+    eventMarketMoveMode: eventContext.marketMoveEventMode,
+    eventContextOperational: eventContext.eventContextOperational
+  };
+
+  logSnapshot(config, scored, undefined, auditFields, undefined, eventContext);
+  const row = JSON.parse(fs.readFileSync(snapshotJsonl, "utf8").trim()) as Record<string, unknown>;
+
+  assert.equal(row.eventContextOperational, false);
+  assert.equal(row.eventRiskLevel, "HIGH");
+  assert.equal(row.eventType, "MACRO");
+  assert.equal(row.eventImpactClass, "TIER_A");
+  assert.equal(row.eventCalendarRiskState, "PRE_EVENT");
+  assert.equal(row.eventMarketMoveMode, "SUPPRESS_WEAK");
+  assert.equal(row.eventConfirmationRequirement, "TWO_SCAN");
+  assert.equal(row.marketMoveWanted, false);
+  assert.equal(row.heartbeatWanted, true);
+  assert.equal(row.moonResearchOnly, true);
+  assert.equal((row.eventContext as EventContext).eventContextOperational, false);
+}
 function fixtureConfig(): BotConfig {
   return {
     scanIntervalMinutes: 15,
@@ -306,7 +382,9 @@ testTierAWindows();
 testTierBAndStacking();
 testCalendarLiquidity();
 testMoonSafety();
+testMissingEventSourceDataDoesNotCrash();
 testFredMacroContextSafety();
 testBehaviorPreservation();
+testSnapshotAuditRowsIncludeEventContextFields();
 
 console.log("EventContext tests passed.");

@@ -88,11 +88,6 @@ export function buildEventContext(nowUtc: Date, options: EventContextBuildOption
     moonPhaseContext
   };
 
-  if (!primary && moonPhaseContext.phase) {
-    context.eventType = "ANOMALY";
-    context.eventImpactClass = "RESEARCH_ONLY";
-  }
-
   return context;
 }
 
