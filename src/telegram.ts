@@ -70,23 +70,15 @@ export function formatRegimeAlert(
   const marketMoveEmoji = selectMarketMoveHeaderEmoji(scoreDelta, isCriticalMarketMove(result, previousResult));
   const actionLines = compactActionLines(result, guidance, useExplainer ? laneExplainer : undefined, true);
   const lines = [
-    ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
-    "",
     ...formatHeader("MARKET", marketMoveEmoji, "MOVE"),
     "",
-    rawDisplayLine(compactRegimeLeaderLine(result)),
-    rawTreeLine("\u251C\u2500", "Score", `${result.score}/100 \u00B7 ${regimeConfidenceLabel(regimeConfidence)}`),
-    rawTreeLine("\u251C\u2500", "Trigger", alertReason),
-    rawTreeLine("\u251C\u2500", "Read", compactMoveRead(result, guidance, useExplainer ? laneExplainer : undefined)),
+    rawLabelLine("Mode", compactModeLeaderLine(result)),
+    rawLabelLine("Score", `${result.score}/100 \u00B7 ${regimeConfidenceLabel(regimeConfidence)}`),
+    rawLabelLine("Trigger", alertReason),
     "",
-    rawTreeSection("\u251C\u2500", "\u{1F3AF}", "If Flat"),
-    rawTreeContinuation(actionLines.ifFlat),
-    "",
-    rawTreeSection("\u251C\u2500", "\u{1F6E1}\uFE0F", "If In"),
-    rawTreeContinuation(actionLines.ifIn),
+    ...formatPlanSection(buildMoveActionLabel(result, guidance), actionLines, useExplainer ? laneExplainer : undefined, result, guidance),
     ...formatContextSection(contextLines),
-    "",
-    rawTreeLine("\u2514\u2500", "Next scan", nextScan),
+    ...formatNextScanSection(nextScan, contextLines.length > 0),
     ...formatFooter()
   ];
 
@@ -109,18 +101,12 @@ export function formatHeartbeatAlert(
     ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
     "",
     rawDisplayLine("\u{1FAC0} Status \u00B7 no fresh Market Move"),
-    rawTreePlain("\u251C\u2500", compactRegimeLeaderLine(result)),
-    rawTreeLine("\u251C\u2500", "Score", `${result.score}/100 \u00B7 ${heartbeatScoreStatus(result, previousResult)}`),
-    rawTreeLine("\u251C\u2500", "Read", compactHeartbeatRead(result, guidance, useExplainer ? laneExplainer : undefined)),
+    rawLabelLine("Mode", compactModeLeaderLine(result)),
+    rawLabelLine("Score", `${result.score}/100 \u00B7 ${heartbeatScoreStatus(result, previousResult)}`),
     "",
-    rawTreeSection("\u251C\u2500", "\u{1F3AF}", "If Flat"),
-    rawTreeContinuation(actionLines.ifFlat),
-    "",
-    rawTreeSection("\u251C\u2500", "\u{1F6E1}\uFE0F", "If In"),
-    rawTreeContinuation(actionLines.ifIn),
+    ...formatPlanSection(buildMoveActionLabel(result, guidance), actionLines, useExplainer ? laneExplainer : undefined, result, guidance),
     ...formatContextSection(contextLines),
-    "",
-    rawTreeLine("\u2514\u2500", "Next scan", nextScan),
+    ...formatNextScanSection(nextScan, contextLines.length > 0),
     ...formatFooter()
   ];
 
@@ -184,8 +170,8 @@ function rawDisplayLine(value: string): string {
   return escapeHtml(value);
 }
 
-function rawTreePlain(branch: "\u251C\u2500" | "\u2514\u2500", value: string): string {
-  return `${branch} ${escapeHtml(value)}`;
+function rawLabelLine(label: string, value: string): string {
+  return `<b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`;
 }
 
 function rawTreeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, value: string): string {
@@ -202,6 +188,10 @@ function rawTreeContinuation(value: string): string {
 
 function compactRegimeLeaderLine(result: RegimeScoreResult): string {
   return `${regimeIcon(result.regime)} ${compactRegimeLabel(result.regime)} \u00B7 ${result.leader}`;
+}
+
+function compactModeLeaderLine(result: RegimeScoreResult): string {
+  return `${compactRegimeLabel(result.regime)} \u00B7 ${result.leader}`;
 }
 
 function regimeIcon(regime: RegimeScoreResult["regime"]): string {
@@ -237,6 +227,39 @@ function compactActionLines(
     ifFlat: fallbackIfFlat(result, guidance),
     ifIn: isRiskOffish(result.regime) ? "Protect capital; wait for repair" : "Hold winners; tighten if score weakens"
   };
+}
+
+function formatPlanSection(
+  planLabel: string,
+  actionLines: { ifFlat: string; ifIn: string },
+  laneExplainer: LaneExplainerResult | undefined,
+  result: RegimeScoreResult,
+  guidance: ActionGuidance
+): string[] {
+  return [
+    rawIconLabelLine("\u{1F3AF}", "Plan", planLabel),
+    rawTreeLine("\u251C\u2500", "Best Lane", compactBestLaneLabel(laneExplainer, result, guidance)),
+    rawTreeLine("\u251C\u2500", "If Flat", actionLines.ifFlat),
+    rawTreeLine("\u2514\u2500", "If In", actionLines.ifIn)
+  ];
+}
+
+function rawIconLabelLine(icon: string, label: string, value: string): string {
+  return `${icon} <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`;
+}
+
+function compactBestLaneLabel(
+  laneExplainer: LaneExplainerResult | undefined,
+  result: RegimeScoreResult,
+  guidance: ActionGuidance
+): string {
+  if (laneExplainer?.bestLaneLabel) return laneExplainer.bestLaneLabel;
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Stables";
+  if (guidance.action === "NO CLEAN EDGE") return "No clean lane";
+  if (guidance.action.includes("BTC") || result.leader === "BTC-led") return "BTC Watch";
+  if (guidance.action.includes("ETH") || result.leader === "ETH-led") return "ETH Watch";
+  if (guidance.action.includes("SOL") || result.leader === "SOL-led") return "SOL Watch";
+  return "Strongest lane";
 }
 
 function fallbackIfFlat(result: RegimeScoreResult, guidance: ActionGuidance): string {
@@ -297,24 +320,25 @@ function compactContextLines(summary: string | null | undefined): string[] {
     .map((part) => part.trim())
     .filter(Boolean)
     .map(compactContextLine)
-    .filter(Boolean);
+    .filter((line): line is string => Boolean(line))
+    .slice(0, 2);
 }
 
-function compactContextLine(value: string): string {
+function compactContextLine(value: string): string | null {
   const normalized = value.trim();
-  if (/^Liquidity: thin weekend window - context only$/i.test(normalized)) return "Thin weekend liquidity \u00B7 context only";
-  if (/^Liquidity: US Holiday/i.test(normalized)) return normalized.replace(/^Liquidity:\s*/i, "").replace(/ - context only$/i, " \u00B7 context only");
-  if (/^Liquidity: month-end window - context only$/i.test(normalized)) return "Month-end liquidity window \u00B7 context only";
-  if (/^Liquidity: quarter-end window - context only$/i.test(normalized)) return "Quarter-end liquidity window \u00B7 context only";
+  if (/^Liquidity: thin weekend window - context only$/i.test(normalized)) return "Thin weekend liquidity";
+  if (/^Liquidity: US Holiday/i.test(normalized)) return normalized.replace(/^Liquidity:\s*/i, "").replace(/ - context only$/i, "");
+  if (/^Liquidity: month-end window - context only$/i.test(normalized)) return "Month-end liquidity window";
+  if (/^Liquidity: quarter-end window - context only$/i.test(normalized)) return "Quarter-end liquidity window";
   if (/^Event Stack:/i.test(normalized)) return `${titleCaseDisplay(normalized)} \u00B7 context only`;
   if (/^Expiry:/i.test(normalized)) return normalized.replace(/ - context only$/i, " \u00B7 context only");
   if (/^Anomaly:/i.test(normalized)) return normalized.replace(/ - research-only$/i, " \u00B7 research-only");
   if (/^BTC halving window:/i.test(normalized)) return normalized.replace(/ - structural context only$/i, " \u00B7 structural context only");
-  if (/^Macro: FRED context available/i.test(normalized)) return "FRED macro available \u00B7 data context only";
-  if (/^Macro: FRED unavailable/i.test(normalized)) return "FRED macro unavailable \u00B7 context skipped";
-  if (/^Liquidity: Treasury FiscalData available/i.test(normalized)) return "Treasury liquidity available \u00B7 TGA context only";
-  if (/^Liquidity: Treasury FiscalData unavailable/i.test(normalized)) return "Treasury liquidity unavailable \u00B7 context skipped";
-  if (/^Liquidity: Net liquidity proxy available/i.test(normalized)) return "Net liquidity proxy available \u00B7 telemetry only";
+  if (/^Macro: FRED context available/i.test(normalized)) return null;
+  if (/^Macro: FRED unavailable/i.test(normalized)) return null;
+  if (/^Liquidity: Treasury FiscalData available/i.test(normalized)) return null;
+  if (/^Liquidity: Treasury FiscalData unavailable/i.test(normalized)) return null;
+  if (/^Liquidity: Net liquidity proxy available/i.test(normalized)) return null;
   return normalized.replace(/ - context only$/i, " \u00B7 context only");
 }
 
@@ -323,9 +347,15 @@ function formatContextSection(contextLines: string[]): string[] {
 
   return [
     "",
-    rawTreeSection("\u251C\u2500", "\u26A0\uFE0F", "Context"),
-    ...contextLines.map(rawTreeContinuation)
+    rawIconLabelLine("\u26A0\uFE0F", "Context", contextLines[0]),
+    ...contextLines.slice(1).map((line) => rawTreeLine("\u251C\u2500", "Event Stack", line))
   ];
+}
+
+function formatNextScanSection(nextScan: string, followsContext: boolean): string[] {
+  return followsContext
+    ? [rawTreeLine("\u2514\u2500", "Next Scan", nextScan)]
+    : ["", rawTreeLine("\u2514\u2500", "Next Scan", nextScan)];
 }
 function titleCaseDisplayToken(token: string): string {
   if (!/[A-Za-z]/.test(token)) return token;

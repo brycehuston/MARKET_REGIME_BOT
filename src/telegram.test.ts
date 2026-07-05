@@ -117,6 +117,27 @@ function testMarketMoveHeaderEmojis(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(0), "MOVE")[1], "\u2022  <b>MARKET \u26A1 MOVE</b>  \u2022");
 }
 
+function countOccurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1;
+}
+
+function assertCompactDensity(alert: string): void {
+  assert.doesNotMatch(alert, /\n\n\n/);
+  assert.doesNotMatch(alert, /│  └─/);
+  assert.doesNotMatch(alert, /Context:<\/b>[^\n]*\n\n└─/u);
+}
+
+function eventContextWithLowValueTelemetry(): ReturnType<typeof buildEventContext> {
+  return buildEventContext(new Date("2026-07-05T08:30:00Z"), {
+    macroContext: { fredEnabled: true } as any,
+    macroLiquidityContext: {
+      treasuryEnabled: false,
+      treasuryError: "fixture unavailable",
+      netLiquidityProxy: 123
+    } as any
+  });
+}
+
 function testMarketMovePremiumCompactLayout(): void {
   const alert = formatRegimeAlert(
     riskOnResult(62),
@@ -127,23 +148,25 @@ function testMarketMovePremiumCompactLayout(): void {
     buildEventContext(new Date("2026-07-05T08:30:00Z"))
   );
 
-  assert.match(alert, /<b>ALPHA ❤️‍🔥 PULSE<\/b>/u);
   assert.match(alert, /<b>MARKET 📈 MOVE<\/b>/u);
+  assert.doesNotMatch(alert, /<b>ALPHA ❤️‍🔥 PULSE<\/b>/u);
+  assert.equal(countOccurrences(alert, "━━━━━━━━━━━━━━━━━━━━━━\n•  <b>"), 1);
+  assert.equal(alert.split("\n")[0], "━".repeat(22));
   assertIncreasingOrder(alert, [
-    "<b>ALPHA ❤️‍🔥 PULSE</b>",
     "<b>MARKET 📈 MOVE</b>",
-    "🟢 Risk-On · SOL-led",
-    "├─ <b>Score:</b> 62/100",
-    "├─ <b>Trigger:</b> Score crossed above 60",
-    "├─ <b>Read:</b> SOL leads; risk-on is selective",
-    "├─ 🎯 <b>If Flat</b>",
-    "│  └─ Wait for clean SOL/ETH follow-through",
-    "├─ 🛡️ <b>If In</b>",
-    "│  └─ Hold winners; tighten if score loses 60",
-    "├─ ⚠️ <b>Context</b>",
-    "Thin weekend liquidity · context only",
-    "└─ <b>Next scan:</b> 08:45 UTC"
+    "<b>Mode:</b> Risk-On · SOL-led",
+    "<b>Score:</b> 62/100",
+    "<b>Trigger:</b> Score crossed above 60",
+    "🎯 <b>Plan:</b> SOL Favored",
+    "├─ <b>Best Lane:</b> SOL leading",
+    "├─ <b>If Flat:</b> Wait for clean SOL/ETH follow-through",
+    "└─ <b>If In:</b> Hold winners; tighten if score loses 60",
+    "⚠️ <b>Context:</b> Thin weekend liquidity",
+    "└─ <b>Next Scan:</b> 08:45 UTC"
   ]);
+  assert.match(alert, /├─ <b>Best Lane:<\/b>/u);
+  assert.match(alert, /└─ <b>If In:<\/b>/u);
+  assertCompactDensity(alert);
 }
 
 function testHeartbeatPremiumCompactLayout(): void {
@@ -152,19 +175,22 @@ function testHeartbeatPremiumCompactLayout(): void {
 
   assert.match(alert, /<b>ALPHA ❤️‍🔥 PULSE<\/b>/u);
   assert.doesNotMatch(alert, /<b>MARKET .* MOVE<\/b>/u);
+  assert.equal(countOccurrences(alert, "━━━━━━━━━━━━━━━━━━━━━━\n•  <b>"), 1);
+  assert.equal(alert.split("\n")[0], "━".repeat(22));
   assertIncreasingOrder(alert, [
     "🫀 Status · no fresh Market Move",
-    "├─ 🟢 Risk-On · SOL-led",
-    "├─ <b>Score:</b> 62/100 · unchanged",
-    "├─ <b>Read:</b> SOL still leads; stay selective",
-    "├─ 🎯 <b>If Flat</b>",
-    "│  └─ Wait for clean SOL/ETH follow-through",
-    "├─ 🛡️ <b>If In</b>",
-    "│  └─ Hold winners; tighten if score loses 60",
-    "├─ ⚠️ <b>Context</b>",
-    "Thin weekend liquidity · context only",
-    "└─ <b>Next scan:</b> 08:45 UTC"
+    "<b>Mode:</b> Risk-On · SOL-led",
+    "<b>Score:</b> 62/100 · unchanged",
+    "🎯 <b>Plan:</b> SOL Favored",
+    "├─ <b>Best Lane:</b> SOL leading",
+    "├─ <b>If Flat:</b> Wait for clean SOL/ETH follow-through",
+    "└─ <b>If In:</b> Hold winners; tighten if score loses 60",
+    "⚠️ <b>Context:</b> Thin weekend liquidity",
+    "└─ <b>Next Scan:</b> 08:45 UTC"
   ]);
+  assert.match(alert, /├─ <b>Best Lane:<\/b>/u);
+  assert.match(alert, /└─ <b>If In:<\/b>/u);
+  assertCompactDensity(alert);
 }
 
 function testHeartbeatScoreDelta(): void {
@@ -183,11 +209,21 @@ function testContextRowsUseDisplayGatedSummary(): void {
   const moveAlert = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, context);
 
   for (const alert of [pulseAlert, moveAlert]) {
-    assert.match(alert, /<b>Context<\/b>/);
+    assert.match(alert, /<b>Context:<\/b>/);
     assert.match(alert, /Event Stack: US Holiday \+ Expiry · context only/);
     assert.doesNotMatch(alert, /hiddenObservedEventsCount|Hidden observed/i);
     assert.doesNotMatch(alert, /Liquidity: US Holiday - Context Only \| Expiry:/);
   }
+}
+
+function testLowValueTelemetrySuppressedFromNormalAlerts(): void {
+  const context = eventContextWithLowValueTelemetry();
+  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-05T08:45:00Z", sampleResult(60), laneExplainer, context);
+
+  assert.match(alert, /⚠️ <b>Context:<\/b> Thin weekend liquidity/u);
+  assert.doesNotMatch(alert, /FRED macro available/i);
+  assert.doesNotMatch(alert, /Treasury liquidity unavailable/i);
+  assert.doesNotMatch(alert, /Net liquidity proxy available/i);
 }
 
 function testFarAwayEventContextHiddenFromAlerts(): void {
@@ -245,6 +281,7 @@ testHeartbeatPremiumCompactLayout();
 testHeartbeatScoreDelta();
 testNoRawDebugBooleansInTelegram();
 testContextRowsUseDisplayGatedSummary();
+testLowValueTelemetrySuppressedFromNormalAlerts();
 testFarAwayEventContextHiddenFromAlerts();
 testDisplayedMoonAndHalvingSafetyLabels();
 testHtmlEscapingForDataValues();
