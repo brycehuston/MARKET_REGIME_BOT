@@ -109,6 +109,8 @@ export type NewsRiskState = "NONE" | "LOW" | "ELEVATED" | "SEVERE" | "UNVERIFIED
 export type ConfirmationRequirement = "NORMAL" | "ONE_CLOSE" | "TWO_SCAN" | "POST_EVENT_WAIT" | "DISABLED_WEAK_ALERTS";
 export type MarketMoveEventMode = "NORMAL" | "CAUTION" | "SUPPRESS_WEAK" | "DELAY" | "POST_EVENT_CONFIRM" | "DEFENSIVE_ONLY";
 export type BacktestDataStatus = "KNOWN_AHEAD" | "REAL_TIME" | "T_PLUS_1" | "POST_EVENT_ONLY" | "UNSAFE_FOR_BACKTEST";
+export type EventConfluenceLevel = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "EXTREME";
+export type MoonPhaseLabel = "FULL_MOON_WINDOW" | "NEW_MOON_WINDOW" | "NONE" | "UNKNOWN";
 export type MacroTrend = "UNKNOWN" | "UP" | "DOWN" | "FLAT";
 export type EquityRiskState = "UNKNOWN" | "RISK_ON" | "NEUTRAL" | "RISK_OFF";
 export type VolRegime = "UNKNOWN" | "LOW" | "ELEVATED" | "STRESSED";
@@ -179,10 +181,28 @@ export interface CryptoCatalystContext {
 }
 
 export interface MoonPhaseContext {
-  phase: string | null;
+  phase: MoonPhaseLabel;
   daysFromFullMoon: number | null;
   daysFromNewMoon: number | null;
   researchOnly: true;
+}
+
+export interface BtcHalvingContext {
+  nextBtcHalvingBlockHeight: 1050000;
+  estimatedNextBtcHalvingTimeUtc: string | null;
+  blocksToNextBtcHalving: number | null;
+  daysToNextBtcHalving: number | null;
+  btcHalvingDisplayWindow: string | null;
+  structuralOnly: true;
+}
+
+export interface DisplayRelevantEvent {
+  tag: string;
+  type: EventType | "LIQUIDITY" | "BTC_HALVING";
+  displayText: string;
+  reason: string;
+  researchOnly?: true;
+  structuralOnly?: true;
 }
 
 export interface EventContext {
@@ -203,11 +223,18 @@ export interface EventContext {
   backtestDataStatus: BacktestDataStatus;
   eventContextVersion: string;
   eventContextOperational: false;
+  eventStackCount: number;
+  eventStackTags: string[];
+  eventConfluenceLevel: EventConfluenceLevel;
+  eventDisplayReasons: string[];
+  displayRelevantEvents: DisplayRelevantEvent[];
+  hiddenObservedEventsCount: number;
   macroContext?: MacroContext;
   macroLiquidityContext?: MacroLiquidityContext;
   fedContext?: FedContext;
   cryptoCatalystContext?: CryptoCatalystContext;
   moonPhaseContext?: MoonPhaseContext;
+  btcHalvingContext: BtcHalvingContext;
 }
 export type ActionMode =
   | "STAY IN STABLES"

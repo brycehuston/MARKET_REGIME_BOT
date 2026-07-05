@@ -98,7 +98,7 @@ function testCalendarLiquidity(): void {
 function testMoonSafety(): void {
   const fullMoon = buildEventContext(utc("2026-07-29T12:00:00Z"));
   assert.equal(fullMoon.moonPhaseContext?.researchOnly, true);
-  assert.equal(fullMoon.moonPhaseContext?.phase, "Full moon");
+  assert.equal(fullMoon.moonPhaseContext?.phase, "FULL_MOON_WINDOW");
   assert.equal(fullMoon.eventType, "NONE");
   assert.equal(fullMoon.eventImpactClass, "NONE");
   assert.equal(fullMoon.eventRiskLevel, "LOW");
@@ -107,12 +107,65 @@ function testMoonSafety(): void {
 
   const newMoon = buildEventContext(utc("2026-07-14T12:00:00Z"));
   assert.equal(newMoon.moonPhaseContext?.researchOnly, true);
-  assert.equal(newMoon.moonPhaseContext?.phase, "New moon");
+  assert.equal(newMoon.moonPhaseContext?.phase, "NEW_MOON_WINDOW");
   assert.equal(newMoon.eventType, "NONE");
   assert.equal(newMoon.eventImpactClass, "NONE");
   assert.equal(newMoon.eventRiskLevel, "LOW");
 }
 
+
+function testDisplayRelevancePolicy(): void {
+  const farMoon = buildEventContext(utc("2026-07-07T12:00:00Z"));
+  assert.equal(farMoon.moonPhaseContext?.phase, "NONE");
+  assert.equal(farMoon.displayRelevantEvents.some((event) => event.tag.includes("MOON")), false);
+  assert.doesNotMatch(formatEventContextSummary(farMoon) ?? "", /moon/i);
+  assert.ok(farMoon.hiddenObservedEventsCount >= 1);
+
+  const fullMoon = buildEventContext(utc("2026-07-29T12:00:00Z"));
+  assert.equal(fullMoon.moonPhaseContext?.phase, "FULL_MOON_WINDOW");
+  assert.match(formatEventContextSummary(fullMoon) ?? "", /research-only/);
+  assert.match(formatEventContextSummary(fullMoon) ?? "", /full moon/i);
+
+  const farHalving = buildEventContext(utc("2026-07-08T12:00:00Z"), {
+    btcHalvingContext: { daysToNextBtcHalving: 602, blocksToNextBtcHalving: 86688 }
+  });
+  assert.equal(farHalving.btcHalvingContext.nextBtcHalvingBlockHeight, 1050000);
+  assert.equal(farHalving.btcHalvingContext.daysToNextBtcHalving, 602);
+  assert.equal(farHalving.btcHalvingContext.btcHalvingDisplayWindow, null);
+  assert.doesNotMatch(formatEventContextSummary(farHalving) ?? "", /halving/i);
+  assert.ok(farHalving.hiddenObservedEventsCount >= 1);
+
+  const nearHalving = buildEventContext(utc("2026-07-08T12:00:00Z"), {
+    btcHalvingContext: { daysToNextBtcHalving: 30, blocksToNextBtcHalving: 4320 }
+  });
+  assert.equal(nearHalving.btcHalvingContext.btcHalvingDisplayWindow, "T-30d");
+  assert.match(formatEventContextSummary(nearHalving) ?? "", /BTC halving window: 30d estimate - structural context only/);
+}
+
+function testDisplayStackingPolicy(): void {
+  const stacked = buildEventContext(utc("2026-07-10T12:00:00Z"), {
+    scheduledEvents: [
+      { name: "FOMC", type: "FED", impactClass: "TIER_A", scheduledUtc: "2026-07-10T12:30:00Z" },
+      { name: "Powell Speech", type: "FED", impactClass: "TIER_B", scheduledUtc: "2026-07-10T13:00:00Z" }
+    ]
+  });
+
+  assert.equal(stacked.eventStackCount, 3);
+  assert.deepEqual(stacked.eventStackTags, ["FOMC", "FED", "EXPIRY"]);
+  assert.equal(stacked.eventConfluenceLevel, "HIGH");
+  assert.equal(stacked.eventDisplayReasons.length, 1);
+  assert.match(stacked.eventDisplayReasons[0], /^Event Stack:/);
+  assert.match(stacked.eventDisplayReasons[0], /FOMC today/);
+  assert.match(stacked.eventDisplayReasons[0], /expiry/);
+
+  const hiddenOnly = buildEventContext(utc("2026-07-08T12:00:00Z"), {
+    scheduledEvents: [{ name: "CPI", type: "MACRO", impactClass: "TIER_A", scheduledUtc: "2026-12-10T12:30:00Z" }],
+    btcHalvingContext: { daysToNextBtcHalving: 602 }
+  });
+  assert.deepEqual(hiddenOnly.eventDisplayReasons, []);
+  assert.equal(hiddenOnly.displayRelevantEvents.length, 0);
+  assert.ok(hiddenOnly.hiddenObservedEventsCount >= 3);
+}
 function testMissingEventSourceDataDoesNotCrash(): void {
   const context = buildEventContext(utc("2026-07-10T12:00:00Z"), {
     scheduledEvents: [
@@ -233,6 +286,13 @@ function testSnapshotAuditRowsIncludeEventContextFields(): void {
   const row = JSON.parse(fs.readFileSync(snapshotJsonl, "utf8").trim()) as Record<string, unknown>;
 
   assert.equal(row.eventContextOperational, false);
+  assert.equal(row.eventStackCount, eventContext.eventStackCount);
+  assert.deepEqual(row.eventStackTags, eventContext.eventStackTags);
+  assert.equal(row.eventConfluenceLevel, eventContext.eventConfluenceLevel);
+  assert.deepEqual(row.eventDisplayReasons, eventContext.eventDisplayReasons);
+  assert.deepEqual(row.displayRelevantEvents, eventContext.displayRelevantEvents);
+  assert.equal(row.hiddenObservedEventsCount, eventContext.hiddenObservedEventsCount);
+  assert.equal(row.nextBtcHalvingBlockHeight, 1050000);
   assert.equal(row.eventContextVersion, eventContext.eventContextVersion);
   assert.equal(row.eventRiskLevel, "HIGH");
   assert.equal(row.eventType, "MACRO");
@@ -395,6 +455,8 @@ testTierAWindows();
 testTierBAndStacking();
 testCalendarLiquidity();
 testMoonSafety();
+testDisplayRelevancePolicy();
+testDisplayStackingPolicy();
 testMissingEventSourceDataDoesNotCrash();
 testFredMacroContextSafety();
 testBehaviorPreservation();

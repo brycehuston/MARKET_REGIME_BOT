@@ -115,6 +115,11 @@ const GROUP_FIELDS = [
   "confirmationRequirement",
   "marketMoveEventMode",
   "eventContextOperational",
+  "eventStackCount",
+  "eventStackTags",
+  "eventConfluenceLevel",
+  "hiddenObservedEventsCount",
+  "btcHalvingDisplayWindow",
   "moonResearchOnly",
   "moonPhase",
   "macroContext.dxyTrend",
@@ -136,6 +141,14 @@ const SNAPSHOT_EXPECTED_COLUMNS = [
   "confirmationRequirement",
   "marketMoveEventMode",
   "eventContextOperational",
+  "eventStackCount",
+  "eventStackTags",
+  "eventConfluenceLevel",
+  "eventDisplayReasons",
+  "displayRelevantEvents",
+  "hiddenObservedEventsCount",
+  "btcHalvingContext",
+  "btcHalvingDisplayWindow",
   "moonResearchOnly",
   "moonPhase",
   "marketMoveWanted",
@@ -361,6 +374,13 @@ function readContextField(raw: Record<string, unknown>, field: string): string {
   }
   if (field.startsWith("macroLiquidityContext.")) {
     return stringFromPath(raw, field) ?? stringFromPath(raw, `eventContext.${field}`) ?? "UNKNOWN";
+  }
+
+  if (field === "moonPhase") {
+    return stringFromPath(raw, "eventContext.moonPhaseContext.phase") ?? "UNKNOWN";
+  }
+  if (field === "btcHalvingDisplayWindow") {
+    return stringFromPath(raw, "eventContext.btcHalvingContext.btcHalvingDisplayWindow") ?? "UNKNOWN";
   }
 
   return stringFromPath(raw, `eventContext.${field}`) ?? "UNKNOWN";

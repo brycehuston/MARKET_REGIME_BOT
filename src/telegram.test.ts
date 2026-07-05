@@ -108,11 +108,19 @@ function testContextAndExpiryRowsAreSeparate(): void {
   const moveAlert = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, context);
 
   for (const alert of [pulseAlert, moveAlert]) {
-    assert.match(alert, /<b>Context Only:<\/b> Liquidity: US Holiday/);
-    assert.match(alert, /<b>Expiry:<\/b> Weekly Options - Context Only/);
-    assert.doesNotMatch(alert, /<b>Context Only:<\/b>[^\n]*- Context Only/);
+    assert.match(alert, /<b>Context Only:<\/b> Event Stack: US Holiday \+ Expiry/);
     assert.doesNotMatch(alert, /Liquidity: US Holiday - Context Only \| Expiry:/);
   }
+}
+
+function testFarAwayEventContextHiddenFromAlerts(): void {
+  const context = buildEventContext(new Date("2026-07-08T09:00:00Z"), {
+    btcHalvingContext: { daysToNextBtcHalving: 602 }
+  });
+  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer, context);
+
+  assert.doesNotMatch(alert, /moon/i);
+  assert.doesNotMatch(alert, /halving/i);
 }
 
 function testFooterSeparatorMatchesHeader(): void {
@@ -131,6 +139,7 @@ function testDisplayCapitalization(): void {
 testAlphaPulseHeader();
 testMarketMoveHeaderEmojis();
 testContextAndExpiryRowsAreSeparate();
+testFarAwayEventContextHiddenFromAlerts();
 testFooterSeparatorMatchesHeader();
 testDisplayCapitalization();
 

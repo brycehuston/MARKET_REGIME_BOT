@@ -338,6 +338,18 @@ export function logSnapshot(
     eventConfirmationRequirement: eventContext?.confirmationRequirement,
     eventBacktestDataStatus: eventContext?.backtestDataStatus,
     eventContextOperational: eventContext?.eventContextOperational,
+    eventStackCount: eventContext?.eventStackCount,
+    eventStackTags: eventContext?.eventStackTags,
+    eventConfluenceLevel: eventContext?.eventConfluenceLevel,
+    eventDisplayReasons: eventContext?.eventDisplayReasons,
+    displayRelevantEvents: eventContext?.displayRelevantEvents,
+    hiddenObservedEventsCount: eventContext?.hiddenObservedEventsCount,
+    btcHalvingContext: eventContext?.btcHalvingContext,
+    nextBtcHalvingBlockHeight: eventContext?.btcHalvingContext?.nextBtcHalvingBlockHeight,
+    estimatedNextBtcHalvingTimeUtc: eventContext?.btcHalvingContext?.estimatedNextBtcHalvingTimeUtc ?? null,
+    blocksToNextBtcHalving: eventContext?.btcHalvingContext?.blocksToNextBtcHalving ?? null,
+    daysToNextBtcHalving: eventContext?.btcHalvingContext?.daysToNextBtcHalving ?? null,
+    btcHalvingDisplayWindow: eventContext?.btcHalvingContext?.btcHalvingDisplayWindow ?? null,
     moonPhase: eventContext?.moonPhaseContext?.phase ?? null,
     daysFromFullMoon: eventContext?.moonPhaseContext?.daysFromFullMoon ?? null,
     daysFromNewMoon: eventContext?.moonPhaseContext?.daysFromNewMoon ?? null,
@@ -349,4 +361,3 @@ export function logError(config: BotConfig, error: unknown): void {
   const message = error instanceof Error ? `${error.stack ?? error.message}` : String(error);
   appendLine(config.paths.errorLog, `[${nowIso()}] ${message}`);
 }
-
