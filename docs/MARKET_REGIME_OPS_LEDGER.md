@@ -7,13 +7,13 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 ## Current State
 
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
-- Current Branch: `fix/telegram-alert-format-v21-mobile-density`
+- Current Branch: `main`
 - Last Known Good Commit: `ac2087f`
-- Current Objective: Review Telegram Alert Format V2.1 Hybrid Mobile Density display-only formatter changes; keep EventContext relevance policy collecting live data before any suppression or scoring changes.
+- Current Objective: Telegram alert formatting restored to pre-V2 style; keep EventContext relevance policy collecting live data before any suppression or scoring changes.
 - Current Phase: Phase 3 - Macro/event/news context layer.
 - Current Blocker: None. EventContext relevance policy is deployed and live verified on VPS.
-- Next Best Action: Review and commit Telegram Alert Format V2.1 Hybrid Mobile Density formatter changes if accepted; otherwise let the bot collect more EventContext/relevance-policy snapshots, then review `logs/event_context_accuracy_report.md` before proposing behavioral changes.
-- Last Validation: 2026-07-05 - Telegram Alert Format V2.1 Hybrid Mobile Density formatter validation passed locally; EventContext relevance policy remains deployed and live verified on VPS.
+- Next Best Action: Review restored pre-V2 Telegram formatter state; then let the bot collect more EventContext/relevance-policy snapshots, then review `logs/event_context_accuracy_report.md` before proposing behavioral changes.
+- Last Validation: 2026-07-05 - Telegram formatter restored to pre-V2 style and formatter validation passed locally; EventContext relevance policy remains deployed and live verified on VPS.
 - Safety Mode: `LIVE_DISABLED` / alert-only. No live trading, wallets, swaps, transaction sending, private keys, or execution paths.
 
 ## Progress Board
@@ -90,7 +90,7 @@ Progress Rules:
 
 ## Task History
 
-- 2026-07-05: Implemented Telegram Alert Format V2.1 Hybrid Mobile Density display-only formatter changes on `fix/telegram-alert-format-v21-mobile-density`; changed `src/telegram.ts`, `src/telegram.test.ts`, and this ledger. Market Move alerts now use one MARKET MOVE header, heartbeat/status alerts use one ALPHA PULSE header, Plan/Context/Next Scan are compact for iPhone Telegram density, low-value macro/treasury telemetry availability text is suppressed from normal alert display, and EventContext remains display-gated and non-operational. Preserved score math, lane math, Best Lane / If Flat / If In logic, Market Move trigger logic, heartbeat cadence, EventContext relevance policy, suppression lock, and alert-only safety boundaries.
+- 2026-07-05: Backed out Telegram Premium Compact V2 / V2.1 display formatting from `src/telegram.ts` and `src/telegram.test.ts`, restoring the pre-V2 Telegram formatter style from `83d329b`; updated this ledger. No score math, lane math, Best Lane / If Flat / If In logic, Market Move trigger logic, heartbeat cadence, EventContext relevance policy, suppression behavior, or execution behavior changed.
 - 2026-07-05: Implemented Telegram Premium Compact V2 display-only formatter changes in working tree on `main`; changed `src/telegram.ts`, `src/telegram.test.ts`, and this ledger. Preserved score math, lane math, Market Move trigger logic, heartbeat cadence, EventContext relevance policy, suppression lock, and alert-only safety boundaries.
 - 2026-07-05: Added EventContext safety tests in `37c65ce`.
 - 2026-07-05: Flattened EventContext snapshot fields in `7639d30`.
@@ -126,15 +126,10 @@ Progress Rules:
 
 ## Validation Status
 
-- 2026-07-05: Telegram Alert Format V2.1 Hybrid Mobile Density local validation passed:
-  - `.\node_modules\.bin\tsx.cmd src\telegram.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\eventContext.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\fred.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\treasury.test.ts`
-  - `.\node_modules\.bin\tsx.cmd src\eventContextAccuracyReport.test.ts`
-  - `npm.cmd run event-context:accuracy`
-  - `npm.cmd run build` passed after sandbox EPERM required approved escalated rerun for writing `dist/*`.
-  - Changed files confirmed by `git diff --stat` / `git status --short`; no files staged.
+- 2026-07-05: Telegram formatter pre-V2 restore validation passed:
+  - Telegram formatter test passed (`src/telegram.test.ts` via tsx).
+  - `git diff --stat`
+  - `git status --short`
 - 2026-07-05: Telegram Premium Compact V2 local validation passed:
   - `.\node_modules\.bin\tsx.cmd src\telegram.test.ts`
   - `.\node_modules\.bin\tsx.cmd src\eventContext.test.ts`
@@ -163,4 +158,4 @@ Progress Rules:
 
 ## Next Exact Action
 
-Review and commit Telegram Alert Format V2.1 Hybrid Mobile Density formatter changes if accepted. Then let `market-regime-bot` collect more live EventContext relevance-policy snapshots and re-run `npm run event-context:accuracy` after enough data accumulates. Do not add suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, or execution behavior until the report proves value.
+Review restored pre-V2 Telegram formatter state. Then let `market-regime-bot` collect more live EventContext relevance-policy snapshots and re-run `npm run event-context:accuracy` after enough data accumulates. Do not add suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, or execution behavior until the report proves value.

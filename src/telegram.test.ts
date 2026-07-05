@@ -10,7 +10,7 @@ import {
 } from "./telegram";
 import { LaneExplainerResult, RegimeScoreResult } from "./types";
 
-function sampleResult(score: number, overrides: Partial<RegimeScoreResult> = {}): RegimeScoreResult {
+function sampleResult(score: number): RegimeScoreResult {
   return {
     timestamp: "2026-07-03T09:00:00Z",
     timeframe: "1h",
@@ -24,8 +24,7 @@ function sampleResult(score: number, overrides: Partial<RegimeScoreResult> = {})
       { name: "BTC trend / structure", score: 0, min: -20, max: 20, label: "Flat", reason: "fixture" },
       { name: "ETH/BTC relative strength", score: 0, min: -10, max: 10, label: "Flat", reason: "fixture" },
       { name: "SOL/BTC relative strength", score: 0, min: -10, max: 10, label: "Flat", reason: "fixture" },
-      { name: "SOL/ETH relative strength", score: 0, min: -10, max: 10, label: "Flat", reason: "fixture" },
-      { name: "Volume confirmation", score: 0, min: -5, max: 5, label: "Flat", reason: "fixture" }
+      { name: "SOL/ETH relative strength", score: 0, min: -10, max: 10, label: "Flat", reason: "fixture" }
     ],
     global: {
       timestamp: "2026-07-03T09:00:00Z",
@@ -43,8 +42,7 @@ function sampleResult(score: number, overrides: Partial<RegimeScoreResult> = {})
       liquidity: "Mixed",
       reason: "fixture",
       components: {}
-    },
-    ...overrides
+    }
   };
 }
 
@@ -62,13 +60,13 @@ const laneExplainer: LaneExplainerResult = {
   laneScoreStables: null,
   leaderPersistenceScans: null,
   riskStyle: "Hold winners",
-  ifInAction: "Hold winners; tighten if score loses 60",
-  ifFlatAction: "Wait for clean SOL/ETH follow-through",
+  ifInAction: "trail, don't chase",
+  ifFlatAction: "wait for BTC repair",
   invalidIf: "SOL lead fades / BTC rejects",
   btcRepairFlag: null,
   timeframeRead: "fixture",
   shortTermState: "fixture",
-  chopState: "Clean",
+  chopState: "Choppy",
   suppressionNote: null,
   scoreFlipCount6h: null,
   scoreRange6h: null,
@@ -89,19 +87,6 @@ const laneExplainer: LaneExplainerResult = {
   retSolEth1d: null
 };
 
-function riskOnResult(score: number): RegimeScoreResult {
-  return sampleResult(score, { regime: "Risk-On", leader: "SOL-led" });
-}
-
-function assertIncreasingOrder(text: string, parts: string[]): void {
-  let lastIndex = -1;
-  for (const part of parts) {
-    const index = text.indexOf(part);
-    assert.ok(index > lastIndex, `Expected ${part} after previous section.`);
-    lastIndex = index;
-  }
-}
-
 function testAlphaPulseHeader(): void {
   const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer);
   const lines = alert.split("\n");
@@ -117,113 +102,15 @@ function testMarketMoveHeaderEmojis(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(0), "MOVE")[1], "\u2022  <b>MARKET \u26A1 MOVE</b>  \u2022");
 }
 
-function countOccurrences(text: string, needle: string): number {
-  return text.split(needle).length - 1;
-}
-
-function assertCompactDensity(alert: string): void {
-  assert.doesNotMatch(alert, /\n\n\n/);
-  assert.doesNotMatch(alert, /│  └─/);
-  assert.doesNotMatch(alert, /Context:<\/b>[^\n]*\n\n└─/u);
-}
-
-function eventContextWithLowValueTelemetry(): ReturnType<typeof buildEventContext> {
-  return buildEventContext(new Date("2026-07-05T08:30:00Z"), {
-    macroContext: { fredEnabled: true } as any,
-    macroLiquidityContext: {
-      treasuryEnabled: false,
-      treasuryError: "fixture unavailable",
-      netLiquidityProxy: 123
-    } as any
-  });
-}
-
-function testMarketMovePremiumCompactLayout(): void {
-  const alert = formatRegimeAlert(
-    riskOnResult(62),
-    "Score crossed above 60",
-    "2026-07-05T08:45:00Z",
-    sampleResult(59),
-    laneExplainer,
-    buildEventContext(new Date("2026-07-05T08:30:00Z"))
-  );
-
-  assert.match(alert, /<b>MARKET 📈 MOVE<\/b>/u);
-  assert.doesNotMatch(alert, /<b>ALPHA ❤️‍🔥 PULSE<\/b>/u);
-  assert.equal(countOccurrences(alert, "━━━━━━━━━━━━━━━━━━━━━━\n•  <b>"), 1);
-  assert.equal(alert.split("\n")[0], "━".repeat(22));
-  assertIncreasingOrder(alert, [
-    "<b>MARKET 📈 MOVE</b>",
-    "<b>Mode:</b> Risk-On · SOL-led",
-    "<b>Score:</b> 62/100",
-    "<b>Trigger:</b> Score crossed above 60",
-    "🎯 <b>Plan:</b> SOL Favored",
-    "├─ <b>Best Lane:</b> SOL leading",
-    "├─ <b>If Flat:</b> Wait for clean SOL/ETH follow-through",
-    "└─ <b>If In:</b> Hold winners; tighten if score loses 60",
-    "⚠️ <b>Context:</b> Thin weekend liquidity",
-    "└─ <b>Next Scan:</b> 08:45 UTC"
-  ]);
-  assert.match(alert, /├─ <b>Best Lane:<\/b>/u);
-  assert.match(alert, /└─ <b>If In:<\/b>/u);
-  assertCompactDensity(alert);
-}
-
-function testHeartbeatPremiumCompactLayout(): void {
-  const current = riskOnResult(62);
-  const alert = formatHeartbeatAlert(current, "2026-07-05T08:45:00Z", current, laneExplainer, buildEventContext(new Date("2026-07-05T08:30:00Z")));
-
-  assert.match(alert, /<b>ALPHA ❤️‍🔥 PULSE<\/b>/u);
-  assert.doesNotMatch(alert, /<b>MARKET .* MOVE<\/b>/u);
-  assert.equal(countOccurrences(alert, "━━━━━━━━━━━━━━━━━━━━━━\n•  <b>"), 1);
-  assert.equal(alert.split("\n")[0], "━".repeat(22));
-  assertIncreasingOrder(alert, [
-    "🫀 Status · no fresh Market Move",
-    "<b>Mode:</b> Risk-On · SOL-led",
-    "<b>Score:</b> 62/100 · unchanged",
-    "🎯 <b>Plan:</b> SOL Favored",
-    "├─ <b>Best Lane:</b> SOL leading",
-    "├─ <b>If Flat:</b> Wait for clean SOL/ETH follow-through",
-    "└─ <b>If In:</b> Hold winners; tighten if score loses 60",
-    "⚠️ <b>Context:</b> Thin weekend liquidity",
-    "└─ <b>Next Scan:</b> 08:45 UTC"
-  ]);
-  assert.match(alert, /├─ <b>Best Lane:<\/b>/u);
-  assert.match(alert, /└─ <b>If In:<\/b>/u);
-  assertCompactDensity(alert);
-}
-
-function testHeartbeatScoreDelta(): void {
-  const alert = formatHeartbeatAlert(riskOnResult(64), "2026-07-05T08:45:00Z", riskOnResult(62), laneExplainer);
-  assert.match(alert, /<b>Score:<\/b> 64\/100 · \+2/);
-}
-
-function testNoRawDebugBooleansInTelegram(): void {
-  const alert = formatHeartbeatAlert(riskOnResult(62), "2026-07-05T08:45:00Z", riskOnResult(62), laneExplainer);
-  assert.doesNotMatch(alert, /Market Move wanted|Market Move sent|Heartbeat wanted|Heartbeat sent/i);
-}
-
-function testContextRowsUseDisplayGatedSummary(): void {
+function testContextAndExpiryRowsAreSeparate(): void {
   const context = buildEventContext(new Date("2026-07-03T09:00:00Z"));
   const pulseAlert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer, context);
   const moveAlert = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, context);
 
   for (const alert of [pulseAlert, moveAlert]) {
-    assert.match(alert, /<b>Context:<\/b>/);
-    assert.match(alert, /Event Stack: US Holiday \+ Expiry · context only/);
-    assert.doesNotMatch(alert, /hiddenObservedEventsCount|Hidden observed/i);
+    assert.match(alert, /<b>Context Only:<\/b> Event Stack: US Holiday \+ Expiry/);
     assert.doesNotMatch(alert, /Liquidity: US Holiday - Context Only \| Expiry:/);
   }
-}
-
-function testLowValueTelemetrySuppressedFromNormalAlerts(): void {
-  const context = eventContextWithLowValueTelemetry();
-  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-05T08:45:00Z", sampleResult(60), laneExplainer, context);
-
-  assert.match(alert, /⚠️ <b>Context:<\/b> Thin weekend liquidity/u);
-  assert.doesNotMatch(alert, /FRED macro available/i);
-  assert.doesNotMatch(alert, /Treasury liquidity unavailable/i);
-  assert.doesNotMatch(alert, /Net liquidity proxy available/i);
 }
 
 function testFarAwayEventContextHiddenFromAlerts(): void {
@@ -234,31 +121,6 @@ function testFarAwayEventContextHiddenFromAlerts(): void {
 
   assert.doesNotMatch(alert, /moon/i);
   assert.doesNotMatch(alert, /halving/i);
-}
-
-function testDisplayedMoonAndHalvingSafetyLabels(): void {
-  const moonAlert = formatHeartbeatAlert(sampleResult(60), "2026-07-29T09:15:00Z", sampleResult(60), laneExplainer, buildEventContext(new Date("2026-07-29T12:00:00Z")));
-  assert.match(moonAlert, /full moon/i);
-  assert.match(moonAlert, /research-only/);
-
-  const halvingAlert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer, buildEventContext(new Date("2026-07-08T09:00:00Z"), {
-    btcHalvingContext: { daysToNextBtcHalving: 30, blocksToNextBtcHalving: 4320 }
-  }));
-  assert.match(halvingAlert, /BTC halving window/i);
-  assert.match(halvingAlert, /structural context only/);
-}
-
-function testHtmlEscapingForDataValues(): void {
-  const unsafeLane: LaneExplainerResult = {
-    ...laneExplainer,
-    ifFlatAction: "Wait <clean> & confirm",
-    ifInAction: "Hold > chase & tighten"
-  };
-  const alert = formatHeartbeatAlert(riskOnResult(62), "2026-07-05T08:45:00Z", riskOnResult(62), unsafeLane);
-
-  assert.match(alert, /Wait &lt;clean&gt; &amp; confirm/);
-  assert.match(alert, /Hold &gt; chase &amp; tighten/);
-  assert.doesNotMatch(alert, /Wait <clean> & confirm/);
 }
 
 function testFooterSeparatorMatchesHeader(): void {
@@ -276,15 +138,8 @@ function testDisplayCapitalization(): void {
 
 testAlphaPulseHeader();
 testMarketMoveHeaderEmojis();
-testMarketMovePremiumCompactLayout();
-testHeartbeatPremiumCompactLayout();
-testHeartbeatScoreDelta();
-testNoRawDebugBooleansInTelegram();
-testContextRowsUseDisplayGatedSummary();
-testLowValueTelemetrySuppressedFromNormalAlerts();
+testContextAndExpiryRowsAreSeparate();
 testFarAwayEventContextHiddenFromAlerts();
-testDisplayedMoonAndHalvingSafetyLabels();
-testHtmlEscapingForDataValues();
 testFooterSeparatorMatchesHeader();
 testDisplayCapitalization();
 
