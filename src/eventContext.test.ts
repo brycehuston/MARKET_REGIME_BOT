@@ -233,15 +233,28 @@ function testSnapshotAuditRowsIncludeEventContextFields(): void {
   const row = JSON.parse(fs.readFileSync(snapshotJsonl, "utf8").trim()) as Record<string, unknown>;
 
   assert.equal(row.eventContextOperational, false);
+  assert.equal(row.eventContextVersion, eventContext.eventContextVersion);
   assert.equal(row.eventRiskLevel, "HIGH");
   assert.equal(row.eventType, "MACRO");
   assert.equal(row.eventImpactClass, "TIER_A");
+  assert.equal(row.calendarRiskState, eventContext.calendarRiskState);
+  assert.equal(row.calendarRiskState, "PRE_EVENT");
+  assert.equal(row.liquidityContext, eventContext.liquidityContext);
+  assert.notEqual(row.liquidityContext, null);
+  assert.equal(row.confirmationRequirement, eventContext.confirmationRequirement);
+  assert.equal(row.confirmationRequirement, "TWO_SCAN");
+  assert.equal(row.marketMoveEventMode, eventContext.marketMoveEventMode);
+  assert.equal(row.marketMoveEventMode, "SUPPRESS_WEAK");
+  assert.equal(row.eventSuppressionReason, eventContext.eventSuppressionReason);
   assert.equal(row.eventCalendarRiskState, "PRE_EVENT");
   assert.equal(row.eventMarketMoveMode, "SUPPRESS_WEAK");
   assert.equal(row.eventConfirmationRequirement, "TWO_SCAN");
   assert.equal(row.marketMoveWanted, false);
   assert.equal(row.heartbeatWanted, true);
   assert.equal(row.moonResearchOnly, true);
+  assert.equal(row.moonPhase, eventContext.moonPhaseContext?.phase);
+  assert.equal(row.daysFromFullMoon, eventContext.moonPhaseContext?.daysFromFullMoon);
+  assert.equal(row.daysFromNewMoon, eventContext.moonPhaseContext?.daysFromNewMoon);
   assert.equal((row.eventContext as EventContext).eventContextOperational, false);
 }
 function fixtureConfig(): BotConfig {

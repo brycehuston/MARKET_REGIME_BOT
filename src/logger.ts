@@ -323,6 +323,12 @@ export function logSnapshot(
     eventRiskLevel: eventContext?.eventRiskLevel,
     eventType: eventContext?.eventType,
     eventImpactClass: eventContext?.eventImpactClass,
+    calendarRiskState: eventContext?.calendarRiskState,
+    liquidityContext: eventContext?.liquidityContext,
+    confirmationRequirement: eventContext?.confirmationRequirement,
+    marketMoveEventMode: eventContext?.marketMoveEventMode,
+    eventSuppressionReason: eventContext?.eventSuppressionReason ?? null,
+    eventContextVersion: eventContext?.eventContextVersion,
     eventCalendarRiskState: eventContext?.calendarRiskState,
     eventLiquidityContext: eventContext?.liquidityContext,
     eventHolidayContext: eventContext?.holidayContext,
@@ -333,6 +339,8 @@ export function logSnapshot(
     eventBacktestDataStatus: eventContext?.backtestDataStatus,
     eventContextOperational: eventContext?.eventContextOperational,
     moonPhase: eventContext?.moonPhaseContext?.phase ?? null,
+    daysFromFullMoon: eventContext?.moonPhaseContext?.daysFromFullMoon ?? null,
+    daysFromNewMoon: eventContext?.moonPhaseContext?.daysFromNewMoon ?? null,
     moonResearchOnly: eventContext?.moonPhaseContext?.researchOnly ?? true
   }));
 }
