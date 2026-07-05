@@ -8,6 +8,7 @@
     "dev": "tsx src/index.ts --loop",
     "accuracy": "tsx src/accuracy.ts",
     "accuracy:coach": "tsx src/accuracyCoach.ts",
+    "event-context:accuracy": "tsx src/eventContextAccuracyReport.ts",
     "backtest": "tsx src/backtest.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js --loop",
