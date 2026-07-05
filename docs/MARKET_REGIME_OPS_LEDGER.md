@@ -9,10 +9,10 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
 - Current Branch: `feat/event-context-relevance-policy-v1`
 - Last Known Good Commit: `9f52763`
-- Current Objective: Merge and deploy EventContext relevance policy, then verify live relevance-policy snapshot fields.
+- Current Objective: Let EventContext relevance policy collect live data; use Accuracy Coach reports before any suppression or scoring changes.
 - Current Phase: Phase 3 - Macro/event/news context layer.
-- Current Blocker: None. EventContext relevance policy and ops ledger updates are committed on `feat/event-context-relevance-policy-v1`.
-- Next Best Action: Merge `feat/event-context-relevance-policy-v1` into `main`, push `main`, deploy to VPS, restart `market-regime-bot` only, and verify relevance-policy snapshot fields.
+- Current Blocker: None. EventContext relevance policy is deployed and live verified on VPS.
+- Next Best Action: Let the bot collect more EventContext/relevance-policy snapshots, then review `logs/event_context_accuracy_report.md` before proposing any behavioral changes.
 - Last Validation: 2026-07-05 - `./node_modules/.bin/tsc.cmd -p tsconfig.json --noEmit` passed.
 - Safety Mode: `LIVE_DISABLED` / alert-only. No live trading, wallets, swaps, transaction sending, private keys, or execution paths.
 
@@ -97,10 +97,26 @@ Progress Rules:
 
 ## Next Exact Action
 
-Merge eat/event-context-relevance-policy-v1 into main, push main, deploy to VPS, restart market-regime-bot only, and verify displayRelevantEvents, hiddenObservedEventsCount, eventStackCount, tcHalvingContext, and moon research-only behavior in live snapshots.
+Let market-regime-bot collect more live EventContext relevance-policy snapshots. Re-run 
+pm run event-context:accuracy after enough data accumulates. Do not add suppression, scoring changes, lane changes, or execution behavior until the report proves value.
 
 
-## Ledger Correction After EventContext Relevance Policy
+## Deployment Verification Update
 
-- 2026-07-05: Corrected stale ledger blocker/next-action wording after `9f52763`. Feature branch is ready for fast-forward merge to `main`.
+- 2026-07-05: Deployed `3c27bf0` to VPS and restarted `market-regime-bot` only.
+- Live verification row: `2026-07-05T08:30:01.233Z`.
+- Verified fields:
+  - `eventContextOperational=false`
+  - `eventStackCount=1`
+  - `eventStackTags=["THIN_WEEKEND"]`
+  - `eventConfluenceLevel=LOW`
+  - `displayRelevantEvents` included only `THIN_WEEKEND`
+  - `hiddenObservedEventsCount=2`
+  - `btcHalvingContext.structuralOnly=true`
+  - `moonResearchOnly=true`
+  - `moonPhase=NONE`
+- PM2 verified:
+  - `market-regime-bot` online
+  - `alpha-x-paper` stopped
+- Safety result: no score math, lane math, Market Move trigger logic, suppression behavior, heartbeat cadence, or execution behavior changed.
 
