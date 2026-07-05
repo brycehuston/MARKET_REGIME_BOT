@@ -63,57 +63,35 @@ export function formatRegimeAlert(
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
-  const marketActivity = defiLine(result);
-  const whyLines = buildMoveWhyLines(result, previousResult, alertReason);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
-  const contextRows = splitContextRows(eventContextSummary);
-  const riskBackLines = useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
+  const contextLines = compactContextLines(eventContextSummary);
   const scoreDelta = previousResult ? result.score - previousResult.score : null;
   const marketMoveEmoji = selectMarketMoveHeaderEmoji(scoreDelta, isCriticalMarketMove(result, previousResult));
-  const whyIcon = scoreDelta !== null && scoreDelta > 0 ? "\u{1F4C8}" : scoreDelta !== null && scoreDelta < 0 ? "\u{1F4C9}" : "\u26A1";
+  const actionLines = compactActionLines(result, guidance, useExplainer ? laneExplainer : undefined, true);
   const lines = [
+    ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
+    "",
     ...formatHeader("MARKET", marketMoveEmoji, "MOVE"),
     "",
-    labeledLine("Alert", buildMoveAlertLabel(result, previousResult)),
-    labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
+    rawDisplayLine(compactRegimeLeaderLine(result)),
+    rawTreeLine("\u251C\u2500", "Score", `${result.score}/100 \u00B7 ${regimeConfidenceLabel(regimeConfidence)}`),
+    rawTreeLine("\u251C\u2500", "Trigger", alertReason),
+    rawTreeLine("\u251C\u2500", "Read", compactMoveRead(result, guidance, useExplainer ? laneExplainer : undefined)),
     "",
-    sectionLine(whyIcon, "Why It Fired"),
-    ...formatTreeRows(whyLines),
+    rawTreeSection("\u251C\u2500", "\u{1F3AF}", "If Flat"),
+    rawTreeContinuation(actionLines.ifFlat),
     "",
-    treeHeaderLine("\u{1F3AF}", "Plan", buildMoveActionLabel(result, guidance)),
-    ...(useExplainer
-      ? formatTreeRows([
-          ["Best Lane", laneExplainer.bestLaneLabel],
-          ["If In", laneExplainer.ifInAction],
-          ["If Flat", laneExplainer.ifFlatAction],
-          ...contextRows
-        ])
-      : formatTreeRows([
-          ["Watch", buildMoveWatchLabel(result, guidance)],
-          ["Avoid", buildMoveAvoidLabel(result, guidance)],
-          ...contextRows
-        ])),
+    rawTreeSection("\u251C\u2500", "\u{1F6E1}\uFE0F", "If In"),
+    rawTreeContinuation(actionLines.ifIn),
+    ...formatContextSection(contextLines),
     "",
-    sectionLine("\u{1F9E0}", "Read"),
-    ...formatTreeRows((useExplainer ? buildExplainerMoveReadLines(result, laneExplainer) : buildMoveReadLines(result, guidance)).map((line) => [null, line])),
-    "",
-    treeHeaderLine("\u{1F30A}", "Market", marketActivity ?? sentenceCase(tempoContext.activityState)),
-    ...formatTreeRows([
-      ["Session", formatSessionLine(tempoContext)],
-      ["Pressure", buildMovePressureLabel(result, guidance, tempoContext)],
-      ["Next Scan", nextScan]
-    ]),
-    "",
-    sectionLine("\u2705", "Risk Back If"),
-    ...formatTreeRows(riskBackLines.map((line) => [null, line])),
-    "",
+    rawTreeLine("\u2514\u2500", "Next scan", nextScan),
     ...formatFooter()
   ];
 
   return lines.join("\n");
 }
-
 export function formatHeartbeatAlert(
   result: RegimeScoreResult,
   nextScanIso: string,
@@ -122,42 +100,32 @@ export function formatHeartbeatAlert(
   eventContext?: EventContext
 ): string {
   const guidance = getActionGuidance(result);
-  const tempoContext = buildTempoTapeContext(result, previousResult);
-  const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
-  const marketActivity = defiLine(result);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
-  const contextRows = splitContextRows(eventContextSummary);
+  const contextLines = compactContextLines(eventContextSummary);
+  const actionLines = compactActionLines(result, guidance, useExplainer ? laneExplainer : undefined, false);
   const lines = [
     ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
     "",
-    labeledLine("Mode", premiumModeLabel(result, guidance)),
-    labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
+    rawDisplayLine("\u{1FAC0} Status \u00B7 no fresh Market Move"),
+    rawTreePlain("\u251C\u2500", compactRegimeLeaderLine(result)),
+    rawTreeLine("\u251C\u2500", "Score", `${result.score}/100 \u00B7 ${heartbeatScoreStatus(result, previousResult)}`),
+    rawTreeLine("\u251C\u2500", "Read", compactHeartbeatRead(result, guidance, useExplainer ? laneExplainer : undefined)),
     "",
-    treeHeaderLine("\u{1F3AF}", "Plan", premiumHoldNowLabel(result, guidance)),
-    ...(useExplainer
-      ? [
-          treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
-          treeLine("\u251C\u2500", "If In", laneExplainer.ifInAction),
-          ...formatTreeRows([["If Flat", laneExplainer.ifFlatAction], ...contextRows])
-        ]
-      : [
-          treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
-          ...formatTreeRows([["Avoid", premiumPulseAvoidLine(result, guidance)], ...contextRows])
-        ]),
+    rawTreeSection("\u251C\u2500", "\u{1F3AF}", "If Flat"),
+    rawTreeContinuation(actionLines.ifFlat),
     "",
-    ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined),
+    rawTreeSection("\u251C\u2500", "\u{1F6E1}\uFE0F", "If In"),
+    rawTreeContinuation(actionLines.ifIn),
+    ...formatContextSection(contextLines),
     "",
-    treeHeaderLine("\u{1F4CA}", "Score", `${result.score}/100`),
-    treeLine("\u2514\u2500", "Next Scan", nextScan),
-    "",
+    rawTreeLine("\u2514\u2500", "Next scan", nextScan),
     ...formatFooter()
   ];
 
   return lines.join("\n");
 }
-
 export function formatHeader(leftTitle: string, emoji: string, rightTitle?: string): string[] {
   const title = rightTitle ? `${leftTitle} ${emoji} ${rightTitle}` : `${leftTitle} ${emoji}`;
   return [ALERT_SEPARATOR, `\u2022  <b>${escapeHtml(title)}</b>  \u2022`, ALERT_SEPARATOR];
@@ -212,6 +180,153 @@ function stripContextOnlySuffix(value: string): string {
   return value.replace(/\s+-\s+context only$/i, "").trim();
 }
 
+function rawDisplayLine(value: string): string {
+  return escapeHtml(value);
+}
+
+function rawTreePlain(branch: "\u251C\u2500" | "\u2514\u2500", value: string): string {
+  return `${branch} ${escapeHtml(value)}`;
+}
+
+function rawTreeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, value: string): string {
+  return `${branch} <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`;
+}
+
+function rawTreeSection(branch: "\u251C\u2500" | "\u2514\u2500", icon: string, label: string): string {
+  return `${branch} ${icon} <b>${escapeHtml(label)}</b>`;
+}
+
+function rawTreeContinuation(value: string): string {
+  return `\u2502  \u2514\u2500 ${escapeHtml(value)}`;
+}
+
+function compactRegimeLeaderLine(result: RegimeScoreResult): string {
+  return `${regimeIcon(result.regime)} ${compactRegimeLabel(result.regime)} \u00B7 ${result.leader}`;
+}
+
+function regimeIcon(regime: RegimeScoreResult["regime"]): string {
+  if (regime === "Risk-Off") return "\u{1F534}";
+  if (regime === "Defensive") return "\u{1F6E1}\uFE0F";
+  if (regime === "Neutral / Chop") return "\u{1F7E1}";
+  return "\u{1F7E2}";
+}
+
+function compactRegimeLabel(regime: RegimeScoreResult["regime"]): string {
+  if (regime === "Strong Risk-On / Rotation") return "Risk-On Rotation";
+  return regime;
+}
+
+function compactActionLines(
+  result: RegimeScoreResult,
+  guidance: ActionGuidance,
+  laneExplainer: LaneExplainerResult | undefined,
+  marketMove: boolean
+): { ifFlat: string; ifIn: string } {
+  if (laneExplainer) {
+    return { ifFlat: laneExplainer.ifFlatAction, ifIn: laneExplainer.ifInAction };
+  }
+
+  if (!marketMove) {
+    return {
+      ifFlat: "Avoid chasing stale moves",
+      ifIn: isRiskOffish(result.regime) ? "Reduce risk; wait for repair" : "Hold clean winners; reduce if score weakens"
+    };
+  }
+
+  return {
+    ifFlat: fallbackIfFlat(result, guidance),
+    ifIn: isRiskOffish(result.regime) ? "Protect capital; wait for repair" : "Hold winners; tighten if score weakens"
+  };
+}
+
+function fallbackIfFlat(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || result.regime === "Defensive") return "Wait for BTC repair";
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return "Wait for a cleaner lane";
+  if (result.leader === "SOL-led") return "Wait for clean SOL/ETH follow-through";
+  if (result.leader === "ETH-led") return "Wait for clean ETH/BTC follow-through";
+  if (result.leader === "BTC-led") return "Wait for clean BTC follow-through";
+  return "Wait for clean leader follow-through";
+}
+
+function compactMoveRead(
+  result: RegimeScoreResult,
+  guidance: ActionGuidance,
+  laneExplainer: LaneExplainerResult | undefined
+): string {
+  if (result.regime === "Risk-Off") return "Risk-off pressure; stables first";
+  if (result.regime === "Defensive") return "Defensive tape; risk not clean";
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") {
+    if (laneExplainer?.bestLane === "SOL") return "SOL leads; broad risk is not clean";
+    return "Market is choppy; wait for confirmation";
+  }
+  if (laneExplainer?.bestLane === "BTC" || result.leader === "BTC-led") return "BTC leads; alts still need proof";
+  if (laneExplainer?.bestLane === "ETH" || result.leader === "ETH-led") return "ETH leads; watch follow-through";
+  if (laneExplainer?.bestLane === "SOL" || result.leader === "SOL-led") return "SOL leads; risk-on is selective";
+  return "Risk is open; stay selective";
+}
+
+function compactHeartbeatRead(
+  result: RegimeScoreResult,
+  guidance: ActionGuidance,
+  laneExplainer: LaneExplainerResult | undefined
+): string {
+  if (result.regime === "Risk-Off") return "Risk remains ugly; stables first";
+  if (result.regime === "Defensive") return "Still defensive; wait for repair";
+  if (guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") {
+    if (laneExplainer?.bestLane === "SOL") return "SOL still leads; risk is not clean";
+    return "No clean edge; stay patient";
+  }
+  if (laneExplainer?.bestLane === "BTC" || result.leader === "BTC-led") return "BTC still leads; avoid late alts";
+  if (laneExplainer?.bestLane === "ETH" || result.leader === "ETH-led") return "ETH still leads; watch follow-through";
+  if (laneExplainer?.bestLane === "SOL" || result.leader === "SOL-led") return "SOL still leads; stay selective";
+  return "Risk remains open; stay selective";
+}
+
+function heartbeatScoreStatus(result: RegimeScoreResult, previousResult: RegimeScoreResult | null | undefined): string {
+  if (!previousResult) return "baseline";
+  const delta = result.score - previousResult.score;
+  if (delta === 0) return "unchanged";
+  return delta > 0 ? `+${delta}` : `${delta}`;
+}
+
+function compactContextLines(summary: string | null | undefined): string[] {
+  if (!summary) return [];
+
+  return summary
+    .split(" | ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map(compactContextLine)
+    .filter(Boolean);
+}
+
+function compactContextLine(value: string): string {
+  const normalized = value.trim();
+  if (/^Liquidity: thin weekend window - context only$/i.test(normalized)) return "Thin weekend liquidity \u00B7 context only";
+  if (/^Liquidity: US Holiday/i.test(normalized)) return normalized.replace(/^Liquidity:\s*/i, "").replace(/ - context only$/i, " \u00B7 context only");
+  if (/^Liquidity: month-end window - context only$/i.test(normalized)) return "Month-end liquidity window \u00B7 context only";
+  if (/^Liquidity: quarter-end window - context only$/i.test(normalized)) return "Quarter-end liquidity window \u00B7 context only";
+  if (/^Event Stack:/i.test(normalized)) return `${titleCaseDisplay(normalized)} \u00B7 context only`;
+  if (/^Expiry:/i.test(normalized)) return normalized.replace(/ - context only$/i, " \u00B7 context only");
+  if (/^Anomaly:/i.test(normalized)) return normalized.replace(/ - research-only$/i, " \u00B7 research-only");
+  if (/^BTC halving window:/i.test(normalized)) return normalized.replace(/ - structural context only$/i, " \u00B7 structural context only");
+  if (/^Macro: FRED context available/i.test(normalized)) return "FRED macro available \u00B7 data context only";
+  if (/^Macro: FRED unavailable/i.test(normalized)) return "FRED macro unavailable \u00B7 context skipped";
+  if (/^Liquidity: Treasury FiscalData available/i.test(normalized)) return "Treasury liquidity available \u00B7 TGA context only";
+  if (/^Liquidity: Treasury FiscalData unavailable/i.test(normalized)) return "Treasury liquidity unavailable \u00B7 context skipped";
+  if (/^Liquidity: Net liquidity proxy available/i.test(normalized)) return "Net liquidity proxy available \u00B7 telemetry only";
+  return normalized.replace(/ - context only$/i, " \u00B7 context only");
+}
+
+function formatContextSection(contextLines: string[]): string[] {
+  if (contextLines.length === 0) return [];
+
+  return [
+    "",
+    rawTreeSection("\u251C\u2500", "\u26A0\uFE0F", "Context"),
+    ...contextLines.map(rawTreeContinuation)
+  ];
+}
 function titleCaseDisplayToken(token: string): string {
   if (!/[A-Za-z]/.test(token)) return token;
   if (/^https?:\/\//i.test(token) || /^0x[0-9a-f]+$/i.test(token) || /[@_]/.test(token) || /\d/.test(token)) return token;
@@ -1475,6 +1590,8 @@ function mixedWatch(): string[] {
     "SOL/BTC holds strength = SOL lane improves"
   ];
 }
+
+
 
 
 

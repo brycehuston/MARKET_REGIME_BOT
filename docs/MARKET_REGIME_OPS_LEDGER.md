@@ -1,4 +1,4 @@
-﻿# Market Regime Bot Ops Ledger
+# Market Regime Bot Ops Ledger
 
 ## Mission
 
@@ -9,11 +9,11 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
 - Current Branch: `main`
 - Last Known Good Commit: `ac2087f`
-- Current Objective: Let EventContext relevance policy collect live data; use Accuracy Coach reports before any suppression or scoring changes.
+- Current Objective: Review Telegram Premium Compact V2 display-only formatter changes; keep EventContext relevance policy collecting live data before any suppression or scoring changes.
 - Current Phase: Phase 3 - Macro/event/news context layer.
 - Current Blocker: None. EventContext relevance policy is deployed and live verified on VPS.
-- Next Best Action: Let the bot collect more EventContext/relevance-policy snapshots, then review `logs/event_context_accuracy_report.md` before proposing any behavioral changes.
-- Last Validation: 2026-07-05 - EventContext relevance policy deployed and live verified on VPS.
+- Next Best Action: Review and commit Telegram Premium Compact V2 formatter changes if accepted; otherwise let the bot collect more EventContext/relevance-policy snapshots, then review `logs/event_context_accuracy_report.md` before proposing behavioral changes.
+- Last Validation: 2026-07-05 - Telegram Premium Compact V2 formatter validation passed locally; EventContext relevance policy remains deployed and live verified on VPS.
 - Safety Mode: `LIVE_DISABLED` / alert-only. No live trading, wallets, swaps, transaction sending, private keys, or execution paths.
 
 ## Progress Board
@@ -90,6 +90,7 @@ Progress Rules:
 
 ## Task History
 
+- 2026-07-05: Implemented Telegram Premium Compact V2 display-only formatter changes in working tree on `main`; changed `src/telegram.ts`, `src/telegram.test.ts`, and this ledger. Preserved score math, lane math, Market Move trigger logic, heartbeat cadence, EventContext relevance policy, suppression lock, and alert-only safety boundaries.
 - 2026-07-05: Added EventContext safety tests in `37c65ce`.
 - 2026-07-05: Flattened EventContext snapshot fields in `7639d30`.
 - 2026-07-05: Added EventContext Accuracy Coach reporting in `81d0cd5`.
@@ -124,6 +125,15 @@ Progress Rules:
 
 ## Validation Status
 
+- 2026-07-05: Telegram Premium Compact V2 local validation passed:
+  - `.\node_modules\.bin\tsx.cmd src\telegram.test.ts`
+  - `.\node_modules\.bin\tsx.cmd src\eventContext.test.ts`
+  - `.\node_modules\.bin\tsx.cmd src\fred.test.ts`
+  - `.\node_modules\.bin\tsx.cmd src\treasury.test.ts`
+  - `.\node_modules\.bin\tsx.cmd src\eventContextAccuracyReport.test.ts`
+  - `npm.cmd run event-context:accuracy`
+  - `npm.cmd run build` passed after sandbox EPERM required approved escalated rerun for writing `dist/*`.
+  - Changed files confirmed by `git diff --stat` / `git status --short`; no files staged.
 - 2026-07-05: EventContext relevance policy validation passed before commit:
   - `.\node_modules\.bin\tsx.cmd src\eventContext.test.ts`
   - `.\node_modules\.bin\tsx.cmd src\telegram.test.ts`
@@ -143,4 +153,4 @@ Progress Rules:
 
 ## Next Exact Action
 
-Let `market-regime-bot` collect more live EventContext relevance-policy snapshots. Re-run `npm run event-context:accuracy` after enough data accumulates. Do not add suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, or execution behavior until the report proves value.
+Review and commit Telegram Premium Compact V2 formatter changes if accepted. Then let `market-regime-bot` collect more live EventContext relevance-policy snapshots and re-run `npm run event-context:accuracy` after enough data accumulates. Do not add suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, or execution behavior until the report proves value.
