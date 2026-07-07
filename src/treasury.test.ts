@@ -30,10 +30,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 function treasuryRows(): unknown {
   return {
     data: [
-      { record_date: "2026-07-01", account_type: "Treasury General Account", close_today_bal: "760", open_today_bal: "755", table_nbr: "III", line_code: "9999", line_item: "Operating Cash Balance" },
-      { record_date: "2026-07-03", account_type: "Treasury General Account", close_today_bal: "810", open_today_bal: "805", table_nbr: "III", line_code: "9999", line_item: "Operating Cash Balance" },
-      { record_date: "2026-07-02", account_type: "Other", close_today_bal: "999", open_today_bal: "999", table_nbr: "III", line_code: "0000", line_item: "Other row" },
-      { record_date: "2026-07-02", account_type: "Treasury General Account", close_today_bal: "790", open_today_bal: "785", table_nbr: "III", line_code: "9999", line_item: "Operating Cash Balance" }
+      { record_date: "2026-07-01", account_type: "Treasury General Account", close_today_bal: "760", open_today_bal: "755", table_nbr: "III", src_line_nbr: "9999", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" },
+      { record_date: "2026-07-03", account_type: "Treasury General Account", close_today_bal: "810", open_today_bal: "805", table_nbr: "III", src_line_nbr: "9999", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" },
+      { record_date: "2026-07-02", account_type: "Other", close_today_bal: "999", open_today_bal: "999", table_nbr: "III", src_line_nbr: "0000", table_nm: "Daily Treasury Statement", sub_table_name: "Other row" },
+      { record_date: "2026-07-02", account_type: "Treasury General Account", close_today_bal: "790", open_today_bal: "785", table_nbr: "III", src_line_nbr: "9999", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" }
     ]
   };
 }
@@ -50,7 +50,7 @@ function testParseOperatingCashBalanceRows(): void {
 function testInvalidNumericValueReturnsNoPointAndUnknownTrend(): void {
   const parsed = extractOperatingCashBalancePoints({
     data: [
-      { record_date: "2026-07-03", account_type: "Treasury General Account", close_today_bal: "not-a-number", line_item: "Operating Cash Balance" }
+      { record_date: "2026-07-03", account_type: "Treasury General Account", close_today_bal: "not-a-number", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" }
     ]
   });
   assert.deepEqual(parsed, []);
@@ -76,8 +76,15 @@ async function testProviderSuccessNoApiKeyRequired(): Promise<void> {
   assert.equal(context.treasurySourceTimestamp, "2026-07-03");
   assert.equal(context.treasuryIngestTimestamp, "2026-07-04T12:00:00.000Z");
   assert.equal(context.treasuryBacktestDataStatus, "REAL_TIME");
-  assert.equal(new URL(requestedUrl).searchParams.has("api_key"), false);
-  assert.equal(new URL(requestedUrl).searchParams.get("sort"), "-record_date");
+  const requestedSearchParams = new URL(requestedUrl).searchParams;
+  const requestedFields = requestedSearchParams.get("fields")?.split(",") ?? [];
+  assert.equal(requestedSearchParams.has("api_key"), false);
+  assert.equal(requestedSearchParams.get("sort"), "-record_date");
+  assert.equal(requestedFields.includes("line_code"), false);
+  assert.equal(requestedFields.includes("line_item"), false);
+  assert.ok(requestedFields.includes("src_line_nbr"));
+  assert.ok(requestedFields.includes("table_nm"));
+  assert.ok(requestedFields.includes("sub_table_name"));
 }
 
 async function testProviderFailureDoesNotThrow(): Promise<void> {

@@ -45,8 +45,9 @@ const TREASURY_FIELDS = [
   "close_today_bal",
   "open_today_bal",
   "table_nbr",
-  "line_code",
-  "line_item"
+  "src_line_nbr",
+  "table_nm",
+  "sub_table_name"
 ];
 
 export class TreasuryFiscalDataProvider {
@@ -225,7 +226,7 @@ function calculateNetLiquidity(
 }
 
 function isOperatingCashBalanceRow(row: Record<string, unknown>): boolean {
-  const joined = [row.account_type, row.line_item, row.table_nbr, row.line_code]
+  const joined = [row.account_type, row.table_nbr, row.src_line_nbr, row.table_nm, row.sub_table_name]
     .filter((value): value is string => typeof value === "string")
     .join(" ")
     .toLowerCase();

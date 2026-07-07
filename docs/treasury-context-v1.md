@@ -20,8 +20,9 @@ Requests pull recent rows sorted by descending `record_date`, with selected fiel
 - `close_today_bal`
 - `open_today_bal`
 - `table_nbr`
-- `line_code`
-- `line_item`
+- `src_line_nbr`
+- `table_nm`
+- `sub_table_name`
 
 The operating cash balance row is treated as Treasury General Account context. `close_today_bal` is parsed as USD millions. If parsing or unit confidence fails, Treasury values stay null/UNKNOWN and net liquidity is not calculated from unsafe units.
 
