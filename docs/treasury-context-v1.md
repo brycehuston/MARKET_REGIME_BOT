@@ -24,7 +24,7 @@ Requests pull recent rows sorted by descending `record_date`, with selected fiel
 - `table_nm`
 - `sub_table_name`
 
-The operating cash balance row is treated as Treasury General Account context. `close_today_bal` is parsed as USD millions. If parsing or unit confidence fails, Treasury values stay null/UNKNOWN and net liquidity is not calculated from unsafe units.
+The selected TGA row is the `Treasury General Account (TGA) Closing Balance` row where `table_nm` is `Operating Cash Balance`; when `src_line_nbr` is present it is expected to be `4`. `open_today_bal` is parsed as USD millions because FiscalData metadata identifies it as `$1,000,000`. `close_today_bal="null"` is expected for this row and is not the parsed value. If parsing or unit confidence fails, Treasury values stay null/UNKNOWN and net liquidity is not calculated from unsafe units.
 
 ## Snapshot Fields
 

@@ -130,7 +130,7 @@ export function extractOperatingCashBalancePoints(raw: unknown): TreasuryOperati
       if (!isRecord(row) || !isOperatingCashBalanceRow(row)) return null;
       const recordDate = typeof row.record_date === "string" ? row.record_date : null;
       if (!recordDate || !isValidRecordDate(recordDate)) return null;
-      const value = parseTreasuryNumber(row.close_today_bal);
+      const value = parseTreasuryNumber(row.open_today_bal);
       if (value === null) return null;
       return { recordDate, value };
     })
@@ -226,17 +226,23 @@ function calculateNetLiquidity(
 }
 
 function isOperatingCashBalanceRow(row: Record<string, unknown>): boolean {
-  const joined = [row.account_type, row.table_nbr, row.src_line_nbr, row.table_nm, row.sub_table_name]
-    .filter((value): value is string => typeof value === "string")
-    .join(" ")
-    .toLowerCase();
+  const accountType = normalizeTreasuryText(row.account_type);
+  const tableName = normalizeTreasuryText(row.table_nm);
+  const sourceLineNumber = row.src_line_nbr === null || row.src_line_nbr === undefined ? null : String(row.src_line_nbr).trim();
 
-  if (joined.includes("treasury general account")) return true;
-  if (joined.includes("operating cash balance")) return true;
-  if (joined.includes("federal reserve account") && joined.includes("account")) return true;
-  return false;
+  if (!accountType.includes("treasury general account")) return false;
+  if (!accountType.includes("closing balance")) return false;
+  if (accountType.includes("opening balance")) return false;
+  if (accountType.includes("total tga deposits")) return false;
+  if (accountType.includes("total tga withdrawals")) return false;
+  if (!tableName.includes("operating cash balance")) return false;
+  if (sourceLineNumber !== null && sourceLineNumber !== "4") return false;
+  return true;
 }
 
+function normalizeTreasuryText(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
 function parseTreasuryNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const text = String(value).trim().replace(/,/g, "");

@@ -30,31 +30,47 @@ function jsonResponse(body: unknown, status = 200): Response {
 function treasuryRows(): unknown {
   return {
     data: [
-      { record_date: "2026-07-01", account_type: "Treasury General Account", close_today_bal: "760", open_today_bal: "755", table_nbr: "III", src_line_nbr: "9999", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" },
-      { record_date: "2026-07-03", account_type: "Treasury General Account", close_today_bal: "810", open_today_bal: "805", table_nbr: "III", src_line_nbr: "9999", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" },
-      { record_date: "2026-07-02", account_type: "Other", close_today_bal: "999", open_today_bal: "999", table_nbr: "III", src_line_nbr: "0000", table_nm: "Daily Treasury Statement", sub_table_name: "Other row" },
-      { record_date: "2026-07-02", account_type: "Treasury General Account", close_today_bal: "790", open_today_bal: "785", table_nbr: "III", src_line_nbr: "9999", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" }
+      { record_date: "2026-07-01", account_type: "Treasury General Account (TGA) Closing Balance", close_today_bal: "null", open_today_bal: "760000", table_nbr: "III", src_line_nbr: "4", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" },
+      { record_date: "2026-07-03", account_type: "Treasury General Account (TGA) Closing Balance", close_today_bal: "null", open_today_bal: "776843", table_nbr: "III", src_line_nbr: "4", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" },
+      { record_date: "2026-07-02", account_type: "Treasury General Account (TGA) Opening Balance", close_today_bal: "null", open_today_bal: "999999", table_nbr: "III", src_line_nbr: "3", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" },
+      { record_date: "2026-07-02", account_type: "Total TGA Deposits", close_today_bal: "null", open_today_bal: "888888", table_nbr: "III", src_line_nbr: "5", table_nm: "Operating Cash Balance", sub_table_name: "Deposits" },
+      { record_date: "2026-07-02", account_type: "Total TGA Withdrawals", close_today_bal: "null", open_today_bal: "777777", table_nbr: "III", src_line_nbr: "6", table_nm: "Operating Cash Balance", sub_table_name: "Withdrawals" },
+      { record_date: "2026-07-02", account_type: "Treasury General Account (TGA) Closing Balance", close_today_bal: "null", open_today_bal: "790000", table_nbr: "III", src_line_nbr: "4", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" }
     ]
   };
 }
-
 function testParseOperatingCashBalanceRows(): void {
   const parsed = extractOperatingCashBalancePoints(treasuryRows());
   assert.deepEqual(parsed, [
-    { recordDate: "2026-07-03", value: 810 },
-    { recordDate: "2026-07-02", value: 790 },
-    { recordDate: "2026-07-01", value: 760 }
+    { recordDate: "2026-07-03", value: 776843 },
+    { recordDate: "2026-07-02", value: 790000 },
+    { recordDate: "2026-07-01", value: 760000 }
   ]);
 }
 
 function testInvalidNumericValueReturnsNoPointAndUnknownTrend(): void {
   const parsed = extractOperatingCashBalancePoints({
     data: [
-      { record_date: "2026-07-03", account_type: "Treasury General Account", close_today_bal: "not-a-number", table_nm: "Daily Treasury Statement", sub_table_name: "Operating Cash Balance" }
+      { record_date: "2026-07-03", account_type: "Treasury General Account (TGA) Closing Balance", close_today_bal: "null", open_today_bal: "not-a-number", src_line_nbr: "4", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" }
     ]
   });
   assert.deepEqual(parsed, []);
   assert.equal(classifyTreasuryTrend(null, 1), "UNKNOWN");
+}
+
+
+function testIgnoresNonClosingTgaRowsAndUsesOpenBalance(): void {
+  const parsed = extractOperatingCashBalancePoints({
+    data: [
+      { record_date: "2026-07-04", account_type: "Treasury General Account (TGA) Opening Balance", close_today_bal: "999999", open_today_bal: "111111", src_line_nbr: "3", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" },
+      { record_date: "2026-07-04", account_type: "Total TGA Deposits", close_today_bal: "999999", open_today_bal: "222222", src_line_nbr: "5", table_nm: "Operating Cash Balance", sub_table_name: "Deposits" },
+      { record_date: "2026-07-04", account_type: "Total TGA Withdrawals", close_today_bal: "999999", open_today_bal: "333333", src_line_nbr: "6", table_nm: "Operating Cash Balance", sub_table_name: "Withdrawals" },
+      { record_date: "2026-07-04", account_type: "Treasury General Account (TGA) Closing Balance", close_today_bal: "null", open_today_bal: "444444", src_line_nbr: "7", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" },
+      { record_date: "2026-07-04", account_type: "Treasury General Account (TGA) Closing Balance", close_today_bal: "null", open_today_bal: "776843", src_line_nbr: "4", table_nm: "Operating Cash Balance", sub_table_name: "Cash Balance Details" }
+    ]
+  });
+
+  assert.deepEqual(parsed, [{ recordDate: "2026-07-04", value: 776843 }]);
 }
 
 async function testProviderSuccessNoApiKeyRequired(): Promise<void> {
@@ -69,9 +85,9 @@ async function testProviderSuccessNoApiKeyRequired(): Promise<void> {
 
   const context = await provider.getContext();
   assert.equal(context.treasuryEnabled, true);
-  assert.equal(context.tgaFiscalData, 810);
-  assert.equal(context.tgaFiscalDataPrior, 790);
-  assert.equal(context.tgaFiscalDataTrend, "EXPANDING");
+  assert.equal(context.tgaFiscalData, 776843);
+  assert.equal(context.tgaFiscalDataPrior, 790000);
+  assert.equal(context.tgaFiscalDataTrend, "CONTRACTING");
   assert.equal(context.tgaFiscalDataRecordDate, "2026-07-03");
   assert.equal(context.treasurySourceTimestamp, "2026-07-03");
   assert.equal(context.treasuryIngestTimestamp, "2026-07-04T12:00:00.000Z");
@@ -82,6 +98,7 @@ async function testProviderSuccessNoApiKeyRequired(): Promise<void> {
   assert.equal(requestedSearchParams.get("sort"), "-record_date");
   assert.equal(requestedFields.includes("line_code"), false);
   assert.equal(requestedFields.includes("line_item"), false);
+  assert.ok(requestedFields.includes("open_today_bal"));
   assert.ok(requestedFields.includes("src_line_nbr"));
   assert.ok(requestedFields.includes("table_nm"));
   assert.ok(requestedFields.includes("sub_table_name"));
@@ -304,6 +321,7 @@ function makeCandles(symbol: string, start: number, step: number): Candle[] {
 async function run(): Promise<void> {
   testParseOperatingCashBalanceRows();
   testInvalidNumericValueReturnsNoPointAndUnknownTrend();
+  testIgnoresNonClosingTgaRowsAndUsesOpenBalance();
   await testProviderSuccessNoApiKeyRequired();
   await testProviderFailureDoesNotThrow();
   testUnitGuardPreventsNetLiquidity();
