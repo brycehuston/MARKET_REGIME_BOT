@@ -1,3 +1,4 @@
+import { buildCalendarContext, buildHolidayContext, buildLaunchWindowContext } from "./calendarContext";
 import {
   BacktestDataStatus,
   CalendarRiskState,
@@ -9,6 +10,7 @@ import {
   EventRiskLevel,
   EventType,
   ExpiryContext,
+  HolidayContext,
   LiquidityContext,
   MarketMoveEventMode,
   MoonPhaseContext
@@ -72,9 +74,12 @@ export function buildEventContext(nowUtc: Date, options: EventContextBuildOption
     throw new Error("buildEventContext requires a valid UTC Date.");
   }
 
-  const holidayContext = usHolidayLabels(nowUtc);
+  const calendarContext = buildCalendarContext(nowUtc);
+  const holidayContextV1 = buildHolidayContext(nowUtc);
+  const launchWindowContext = buildLaunchWindowContext(nowUtc, holidayContextV1);
+  const holidayContext = unique(holidayContextV1.activeHolidays.map((holiday) => holiday.name));
   const expiryContext = deriveExpiryContext(nowUtc);
-  const liquidityContext = deriveLiquidityContext(nowUtc, holidayContext, expiryContext);
+  const liquidityContext = deriveLiquidityContext(nowUtc, holidayContextV1, expiryContext);
   const moonPhaseContext = deriveMoonPhaseContext(nowUtc);
   const btcHalvingContext = deriveBtcHalvingContext(nowUtc, options.btcHalvingContext);
   const scheduledEvents = options.scheduledEvents ?? DEFAULT_SCHEDULED_EVENTS;
@@ -84,7 +89,7 @@ export function buildEventContext(nowUtc: Date, options: EventContextBuildOption
     .sort((left, right) => impactRank(right.event.impactClass) - impactRank(left.event.impactClass) || Math.abs(left.minutesDelta) - Math.abs(right.minutesDelta));
   const primary = activeWindows[0] ?? null;
   const nextHighImpact = nearestFutureHighImpact(nowUtc, scheduledEvents);
-  const observedDisplayCandidates = buildObservedDisplayCandidates(nowUtc, scheduledEvents, liquidityContext, holidayContext, expiryContext, moonPhaseContext, btcHalvingContext);
+  const observedDisplayCandidates = buildObservedDisplayCandidates(nowUtc, scheduledEvents, liquidityContext, holidayContextV1, expiryContext, moonPhaseContext, btcHalvingContext);
   const displayRelevantEvents = observedDisplayCandidates
     .filter((candidate) => candidate.relevant && candidate.displayText && candidate.reason)
     .map((candidate): DisplayRelevantEvent => ({
@@ -130,7 +135,10 @@ export function buildEventContext(nowUtc: Date, options: EventContextBuildOption
     fedContext: options.fedContext,
     cryptoCatalystContext: options.cryptoCatalystContext,
     moonPhaseContext,
-    btcHalvingContext
+    btcHalvingContext,
+    calendarContext,
+    holidayContextV1,
+    launchWindowContext
   };
 
   return context;
@@ -138,6 +146,19 @@ export function buildEventContext(nowUtc: Date, options: EventContextBuildOption
 
 export function formatEventContextSummary(eventContext: EventContext): string | null {
   const parts: string[] = [...eventContext.eventDisplayReasons];
+
+  const launchWindow = eventContext.launchWindowContext;
+  if (launchWindow.launchWindowActive && launchWindow.launchWindowReason) {
+    parts.push(launchWindow.launchWindowReason);
+  } else if (eventContext.calendarContext.weekendFlag) {
+    parts.push("Calendar: Weekend liquidity window - telemetry only; no score impact.");
+  }
+
+  if (eventContext.calendarContext.quarterEndFlag) {
+    parts.push("Calendar: Month-end / quarter-end - liquidity context only; no score impact.");
+  } else if (eventContext.calendarContext.monthEndFlag) {
+    parts.push("Calendar: Month-end - liquidity context only; no score impact.");
+  }
 
   if (eventContext.macroContext) {
     if (eventContext.macroContext.fredEnabled) {
@@ -166,7 +187,7 @@ function buildObservedDisplayCandidates(
   nowUtc: Date,
   scheduledEvents: ScheduledEventContextInput[],
   liquidityContext: LiquidityContext,
-  holidayContext: string[],
+  holidayContext: HolidayContext,
   expiryContext: ExpiryContext,
   moonPhaseContext: MoonPhaseContext,
   btcHalvingContext: EventContext["btcHalvingContext"]
@@ -216,15 +237,17 @@ function scheduledDisplayTag(eventName: string, eventType: EventType): string {
   return eventType;
 }
 
-function calendarDisplayCandidates(nowUtc: Date, liquidityContext: LiquidityContext, holidayContext: string[], expiryContext: ExpiryContext): ObservedDisplayCandidate[] {
+function calendarDisplayCandidates(nowUtc: Date, liquidityContext: LiquidityContext, holidayContext: HolidayContext, expiryContext: ExpiryContext): ObservedDisplayCandidate[] {
   const candidates: ObservedDisplayCandidate[] = [];
 
   const tomorrow = addUtcDays(nowUtc, 1);
-  const tomorrowHoliday = usHolidayLabels(tomorrow);
-  if (holidayContext.length > 0) {
-    candidates.push(calendarCandidate("US_HOLIDAY", "HOLIDAY", `Liquidity: US Holiday today (${holidayContext.join(", ")}) - context only`, true));
-  } else if (tomorrowHoliday.length > 0) {
-    candidates.push(calendarCandidate("US_HOLIDAY", "HOLIDAY", `Liquidity: US Holiday tomorrow (${tomorrowHoliday.join(", ")}) - context only`, true));
+  const tomorrowHoliday = buildHolidayContext(tomorrow);
+  if (holidayContext.activeHolidays.length > 0) {
+    const countryLabel = holidayContext.countryCodes.join("/") || "calendar";
+    candidates.push(calendarCandidate("HOLIDAY", "HOLIDAY", `Liquidity: ${countryLabel} holiday today (${holidayContext.activeHolidays.map((holiday) => holiday.name).join(", ")}) - context only`, true));
+  } else if (tomorrowHoliday.activeHolidays.length > 0) {
+    const countryLabel = tomorrowHoliday.countryCodes.join("/") || "calendar";
+    candidates.push(calendarCandidate("HOLIDAY", "HOLIDAY", `Liquidity: ${countryLabel} holiday tomorrow (${tomorrowHoliday.activeHolidays.map((holiday) => holiday.name).join(", ")}) - context only`, true));
   }
 
   if (liquidityContext === "THIN_WEEKEND") {
@@ -369,8 +392,10 @@ function nearestFutureHighImpact(nowUtc: Date, events: ScheduledEventContextInpu
   return candidates[0] ?? null;
 }
 
-function deriveLiquidityContext(nowUtc: Date, holidayContext: string[], expiryContext: ExpiryContext): LiquidityContext {
-  if (holidayContext.length > 0) return "US_HOLIDAY";
+function deriveLiquidityContext(nowUtc: Date, holidayContext: HolidayContext, expiryContext: ExpiryContext): LiquidityContext {
+  const activeCountries = new Set(holidayContext.countryCodes);
+  if (activeCountries.has("US")) return "US_HOLIDAY";
+  if (activeCountries.size > 0 && !activeCountries.has("CA")) return "GLOBAL_HOLIDAY";
   if (expiryContext !== "NONE") return "EXPIRY_DAY";
   if (isQuarterEnd(nowUtc)) return "QUARTER_END";
   if (isMonthEnd(nowUtc)) return "MONTH_END";
