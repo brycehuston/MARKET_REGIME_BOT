@@ -120,6 +120,32 @@ export type LiquidityUnits = "USD_MILLIONS" | "UNKNOWN";
 export type EtfFlowLagState = "UNKNOWN" | "T_PLUS_1_AVAILABLE" | "NOT_AVAILABLE";
 export type TokenUnlockRisk = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
 export type ChainStatusRisk = "NONE" | "DEGRADED" | "OUTAGE" | "UNKNOWN";
+export type CalendarLiquidityContext =
+  | "NORMAL"
+  | "THIN_WEEKEND"
+  | "US_HOLIDAY"
+  | "CANADA_HOLIDAY"
+  | "GLOBAL_HOLIDAY"
+  | "LONG_WEEKEND"
+  | "MONTH_END"
+  | "QUARTER_END"
+  | "YEAR_END";
+export type CalendarContextRiskState = "CLEAR" | "CALENDAR_CAUTION";
+export type HolidayType = "NATIONAL" | "BANK" | "CULTURAL" | "GLOBAL" | "CRYPTO_RELEVANT";
+export type HolidayContextSource = "STATIC_CALENDAR_V1";
+export type LaunchWindowType =
+  | "NONE"
+  | "NATIONAL_HOLIDAY_THEME"
+  | "MEME_DATE"
+  | "CONFERENCE_DATE"
+  | "NEWS_CYCLE_THEME"
+  | "SPORTS_FINAL_THEME"
+  | "ELECTION_THEME"
+  | "CELEBRITY_TREND_THEME"
+  | "HIGH_RUG_RISK_THEME"
+  | "UNKNOWN";
+export type LaunchWindowRisk = "NONE" | "ELEVATED_NOISE" | "HIGH_PVP" | "UNKNOWN";
+export type LaunchWindowMarket = "NONE" | "SOL_MEME_MICROCAPS" | "BROAD_CRYPTO" | "UNKNOWN";
 
 export interface MacroContext {
   dxyTrend: MacroTrend;
@@ -196,6 +222,54 @@ export interface BtcHalvingContext {
   structuralOnly: true;
 }
 
+export interface CalendarContext {
+  calendarContextVersion: string;
+  scanDateUtc: string;
+  scanDayOfWeekUtc: string;
+  weekendFlag: boolean;
+  monthEndFlag: boolean;
+  quarterEndFlag: boolean;
+  yearEndFlag: boolean;
+  longWeekendFlag: boolean;
+  liquidityContext: CalendarLiquidityContext;
+  calendarRiskState: CalendarContextRiskState;
+  backtestDataStatus: "KNOWN_AHEAD";
+  calendarContextOperational: false;
+}
+
+export interface HolidayItem {
+  name: string;
+  countryCode: string;
+  date: string;
+  observedDate: string | null;
+  type: HolidayType;
+  daysUntil: number;
+  isToday: boolean;
+  isObservedToday: boolean;
+}
+
+export interface HolidayContext {
+  activeHolidays: HolidayItem[];
+  upcomingHolidaysNext7d: HolidayItem[];
+  observedHolidayToday: boolean;
+  actualHolidayToday: boolean;
+  countryCodes: string[];
+  holidayContextText: string | null;
+  source: HolidayContextSource;
+  backtestDataStatus: "KNOWN_AHEAD";
+}
+
+export interface LaunchWindowContext {
+  launchWindowActive: boolean;
+  launchWindowType: LaunchWindowType;
+  launchWindowName: string | null;
+  launchWindowRisk: LaunchWindowRisk;
+  launchWindowReason: string | null;
+  affectedMarket: LaunchWindowMarket;
+  backtestDataStatus: "KNOWN_AHEAD";
+  telemetryOnly: true;
+}
+
 export interface DisplayRelevantEvent {
   tag: string;
   type: EventType | "LIQUIDITY" | "BTC_HALVING";
@@ -235,6 +309,9 @@ export interface EventContext {
   cryptoCatalystContext?: CryptoCatalystContext;
   moonPhaseContext?: MoonPhaseContext;
   btcHalvingContext: BtcHalvingContext;
+  calendarContext: CalendarContext;
+  holidayContextV1: HolidayContext;
+  launchWindowContext: LaunchWindowContext;
 }
 export type ActionMode =
   | "STAY IN STABLES"

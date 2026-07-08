@@ -38,6 +38,11 @@ function testDefaultSafety(): void {
   assert.equal(context.marketMoveEventMode, "NORMAL");
   assert.equal(context.backtestDataStatus, "KNOWN_AHEAD");
   assert.equal(context.eventContextOperational, false);
+  assert.equal(context.calendarContext.calendarContextOperational, false);
+  assert.equal(context.calendarContext.backtestDataStatus, "KNOWN_AHEAD");
+  assert.equal(context.holidayContextV1.backtestDataStatus, "KNOWN_AHEAD");
+  assert.equal(context.launchWindowContext.telemetryOnly, true);
+  assert.equal(context.launchWindowContext.backtestDataStatus, "KNOWN_AHEAD");
   assert.equal(context.moonPhaseContext?.researchOnly, true);
 }
 
@@ -286,6 +291,20 @@ function testSnapshotAuditRowsIncludeEventContextFields(): void {
   const row = JSON.parse(fs.readFileSync(snapshotJsonl, "utf8").trim()) as Record<string, unknown>;
 
   assert.equal(row.eventContextOperational, false);
+  assert.equal(row.calendarContextVersion, eventContext.calendarContext.calendarContextVersion);
+  assert.equal(row.weekendFlag, eventContext.calendarContext.weekendFlag);
+  assert.equal(row.monthEndFlag, eventContext.calendarContext.monthEndFlag);
+  assert.equal(row.quarterEndFlag, eventContext.calendarContext.quarterEndFlag);
+  assert.equal(row.yearEndFlag, eventContext.calendarContext.yearEndFlag);
+  assert.equal(row.longWeekendFlag, eventContext.calendarContext.longWeekendFlag);
+  assert.equal(row.calendarLiquidityContext, eventContext.calendarContext.liquidityContext);
+  assert.deepEqual(row.activeHolidayNames, eventContext.holidayContextV1.activeHolidays.map((holiday) => holiday.name));
+  assert.deepEqual(row.holidayCountryCodes, eventContext.holidayContextV1.countryCodes);
+  assert.equal(row.launchWindowActive, eventContext.launchWindowContext.launchWindowActive);
+  assert.equal(row.launchWindowType, eventContext.launchWindowContext.launchWindowType);
+  assert.equal(row.launchWindowName, eventContext.launchWindowContext.launchWindowName);
+  assert.equal(row.launchWindowRisk, eventContext.launchWindowContext.launchWindowRisk);
+  assert.equal(row.launchWindowReason, eventContext.launchWindowContext.launchWindowReason);
   assert.equal(row.eventStackCount, eventContext.eventStackCount);
   assert.deepEqual(row.eventStackTags, eventContext.eventStackTags);
   assert.equal(row.eventConfluenceLevel, eventContext.eventConfluenceLevel);
