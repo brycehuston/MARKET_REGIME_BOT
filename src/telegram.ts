@@ -4,7 +4,7 @@ import { ActionGuidance, EventContext, LaneExplainerResult, LeaderName, RegimeCo
 const ALERT_SEPARATOR = "\u2501".repeat(22);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
 const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01";
-const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD"]);
+const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD", "FRED", "TGA", "NY"]);
 export interface TempoTapeContext {
   sessionPhase: string;
   sessionElapsedMinutes: number | null;
@@ -67,7 +67,7 @@ export function formatRegimeAlert(
   const whyLines = buildMoveWhyLines(result, previousResult, alertReason);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
-  const contextRows = splitContextRows(eventContextSummary);
+  const contextRows = buildContextRows(eventContext, eventContextSummary);
   const riskBackLines = useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
   const scoreDelta = previousResult ? result.score - previousResult.score : null;
   const marketMoveEmoji = selectMarketMoveHeaderEmoji(scoreDelta, isCriticalMarketMove(result, previousResult));
@@ -86,15 +86,14 @@ export function formatRegimeAlert(
       ? formatTreeRows([
           ["Best Lane", laneExplainer.bestLaneLabel],
           ["If In", laneExplainer.ifInAction],
-          ["If Flat", laneExplainer.ifFlatAction],
-          ...contextRows
+          ["If Flat", laneExplainer.ifFlatAction]
         ])
       : formatTreeRows([
           ["Watch", buildMoveWatchLabel(result, guidance)],
-          ["Avoid", buildMoveAvoidLabel(result, guidance)],
-          ...contextRows
+          ["Avoid", buildMoveAvoidLabel(result, guidance)]
         ])),
     "",
+    ...formatContextSection(contextRows),
     sectionLine("\u{1F9E0}", "Read"),
     ...formatTreeRows((useExplainer ? buildExplainerMoveReadLines(result, laneExplainer) : buildMoveReadLines(result, guidance)).map((line) => [null, line])),
     "",
@@ -128,7 +127,7 @@ export function formatHeartbeatAlert(
   const marketActivity = defiLine(result);
   const useExplainer = shouldUseLaneExplainer(laneExplainer);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
-  const contextRows = splitContextRows(eventContextSummary);
+  const contextRows = buildContextRows(eventContext, eventContextSummary);
   const lines = [
     ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
     "",
@@ -140,13 +139,14 @@ export function formatHeartbeatAlert(
       ? [
           treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
           treeLine("\u251C\u2500", "If In", laneExplainer.ifInAction),
-          ...formatTreeRows([["If Flat", laneExplainer.ifFlatAction], ...contextRows])
+          ...formatTreeRows([["If Flat", laneExplainer.ifFlatAction]])
         ]
       : [
           treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
-          ...formatTreeRows([["Avoid", premiumPulseAvoidLine(result, guidance)], ...contextRows])
+          ...formatTreeRows([["Avoid", premiumPulseAvoidLine(result, guidance)]])
         ]),
     "",
+    ...formatContextSection(contextRows),
     ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined),
     "",
     treeHeaderLine("\u{1F4CA}", "Score", `${result.score}/100`),
@@ -191,25 +191,86 @@ export function selectMarketMoveHeaderEmoji(scoreDelta: number | null | undefine
   return "\u26A1";
 }
 
-function splitContextRows(summary: string | null | undefined): Array<[string, string]> {
+function splitContextRows(summary: string | null | undefined): string[] {
   if (!summary) return [];
 
-  return summary
+  const rows = summary
     .split(" | ")
     .map((part) => part.trim())
     .filter(Boolean)
-    .map((part): [string, string] => {
-      const separatorIndex = part.indexOf(":");
-      if (separatorIndex <= 0) return ["Context Only", stripContextOnlySuffix(part)];
-      const rawLabel = part.slice(0, separatorIndex).trim();
-      const rawValue = part.slice(separatorIndex + 1).trim();
-      if (rawLabel === "Expiry") return ["Expiry", rawValue];
-      return ["Context Only", stripContextOnlySuffix(part)];
-    });
+    .map(compactContextRow)
+    .filter(Boolean);
+  return [...new Set(rows)].sort(compareContextRows);
 }
 
-function stripContextOnlySuffix(value: string): string {
-  return value.replace(/\s+-\s+context only$/i, "").trim();
+function buildContextRows(eventContext: EventContext | undefined, summary: string | null): string[] {
+  const rows = splitContextRows(summary);
+  if (eventContext?.calendarContext.weekendFlag) rows.unshift("Weekend Liquidity");
+  if (eventContext?.holidayContextV1.activeHolidays.some((holiday) => /^(Good Friday|Easter Sunday|Easter Monday)$/.test(holiday.name))) {
+    rows.push("Holiday Liquidity");
+  }
+  return [...new Set(rows)].sort(compareContextRows);
+}
+
+function compareContextRows(left: string, right: string): number {
+  return contextRowPriority(left) - contextRowPriority(right);
+}
+
+function contextRowPriority(row: string): number {
+  if (row === "Weekend Liquidity") return 0;
+  if (row === "Expiry Window") return 3;
+  if (/Window|Easter Weekend|Black Friday \/ Cyber Monday/.test(row)) return 1;
+  if (row === "Holiday Liquidity") return 2;
+  if (/Expiry|Month-End|Quarter-End|Moon Research|Expiry \+ New Moon/.test(row)) return 3;
+  return 4;
+}
+
+function formatContextSection(rows: string[]): string[] {
+  if (rows.length === 0) return [];
+  return [sectionLine("\u{1F4CE}", "Context Only"), ...rows.map((row, index) => {
+    const branch = index === rows.length - 1 ? "\u2514\u2500" : "\u251C\u2500";
+    return `${branch} ${escapeHtml(row)}`;
+  }), ""];
+}
+
+function compactContextRow(value: string): string {
+  const lower = value.toLowerCase();
+  if (lower === "event stack: holiday today + new moon research tag") return "New Moon Research";
+  if (lower === "event stack: holiday today + expiry + new moon research tag") return "Expiry + New Moon";
+  if (lower === "event stack: holiday today + full moon research tag") return "Full Moon Research";
+  if (lower === "event stack: holiday today + month-end") return "Month-End Flows";
+  if (lower === "event stack: holiday today + expiry") return "Expiry Window";
+  if (lower === "event stack: holiday today + expiry + month-end") return "Expiry + Month-End";
+  if (lower.startsWith("event stack:")) {
+    return value.replace(/^Event Stack:\s*/i, "").replace(/Holiday Today\s*\+?\s*/i, "").replace(/Research Tag/gi, "Research").trim();
+  }
+  if (lower.includes("thin weekend") || lower.includes("weekend liquidity")) return "Weekend Liquidity";
+  if (lower.includes("canada day")) return "Canada Day Window 🇨🇦";
+  if (lower.includes("july 4th")) return "July 4th Window 🇺🇸";
+  if (lower.includes("us holiday today") && lower.includes("independence day")) return "July 4th Window 🇺🇸";
+  if (lower.includes("new year")) return "New Year Window";
+  if (lower.includes("christmas") || lower.includes("year-end")) return "Year-End Liquidity";
+  if (lower.includes("quarter-end")) return "Quarter-End Flows";
+  if (lower.includes("month-end")) return "Month-End Flows";
+  if (lower.includes("valentine")) return "Valentine’s Window 💘";
+  if (lower.includes("st patrick")) return "St Patrick’s Window 🍀";
+  if (lower.includes("easter") || lower.includes("good friday")) return "Easter Weekend 🐣";
+  if (lower.includes("april fools")) return "April Fools Window 🃏";
+  if (lower.includes("cinco de mayo")) return "Cinco de Mayo Window";
+  if (lower.includes("halloween")) return "Halloween Window 🎃";
+  if (lower.includes("black friday") || lower.includes("cyber monday")) return "Black Friday / Cyber Monday";
+  if (lower.includes("fred") && lower.includes("unavailable")) return "Macro: FRED Unavailable";
+  if (lower.includes("fred") && lower.includes("available")) return "Macro: FRED Available";
+  if (lower.includes("treasury") && lower.includes("unavailable")) return "Treasury: TGA Unavailable";
+  if (lower.includes("treasury") && lower.includes("available")) return "Treasury: TGA Available";
+  if (lower.includes("net liquidity") && lower.includes("available")) return "Net Liquidity: Available";
+  if (lower.includes("global holiday") || lower.includes("holiday liquidity")) return "Holiday Liquidity";
+
+  return value
+    .replace(/\s*-\s*(telemetry only|data context only|liquidity context only|context only)(?:;[^.]*)?\.?$/i, "")
+    .replace(/\s*;\s*no score(?:, lane, trigger, or suppression)? impact\.?$/i, "")
+    .replace(/\s*-\s*context skipped\.?$/i, " Unavailable")
+    .trim();
 }
 
 function titleCaseDisplayToken(token: string): string {

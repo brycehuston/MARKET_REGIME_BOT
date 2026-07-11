@@ -7,7 +7,7 @@ import {
   LaunchWindowContext
 } from "./types";
 
-const CALENDAR_CONTEXT_VERSION = "calendar-context-v1";
+const CALENDAR_CONTEXT_VERSION = "calendar-context-v1.1";
 const MS_PER_DAY = 86400000;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
@@ -84,7 +84,7 @@ export function buildHolidayContext(scanTimeUtc: Date): HolidayContext {
     actualHolidayToday: activeHolidays.some((holiday) => holiday.isToday),
     countryCodes,
     holidayContextText: names.length > 0 ? names.join(", ") : null,
-    source: "STATIC_CALENDAR_V1",
+    source: "STATIC_CALENDAR_V1_1",
     backtestDataStatus: "KNOWN_AHEAD"
   };
 }
@@ -92,41 +92,23 @@ export function buildHolidayContext(scanTimeUtc: Date): HolidayContext {
 export function buildLaunchWindowContext(scanTimeUtc: Date, holidayContext: HolidayContext = buildHolidayContext(scanTimeUtc)): LaunchWindowContext {
   assertValidDate(scanTimeUtc);
 
-  if (isCanadaDayWindow(scanTimeUtc)) {
-    return activeLaunchWindow(
-      "Canada Day window",
-      "Calendar: Canada Day window - thin liquidity and meme-launch noise may be elevated.",
-      "SOL_MEME_MICROCAPS",
-      "ELEVATED_NOISE"
-    );
-  }
-
-  if (isJulyFourthWindow(scanTimeUtc)) {
-    return activeLaunchWindow(
-      "July 4th window",
-      "Calendar: July 4th window - institutional volume may be thin; fakeout risk context only.",
-      "SOL_MEME_MICROCAPS",
-      "ELEVATED_NOISE"
-    );
-  }
-
   if (isNewYearWindow(scanTimeUtc)) {
-    return activeLaunchWindow(
-      "New Year window",
-      "Calendar: New Year window - thin liquidity and narrative noise may be elevated.",
-      "BROAD_CRYPTO",
-      "ELEVATED_NOISE"
-    );
+    return activeLaunchWindow("New Year Window", "Calendar: New Year window - thin liquidity and narrative noise may be elevated.", "BROAD_CRYPTO", "ELEVATED_NOISE", "NATIONAL_HOLIDAY_THEME");
   }
 
   if (isChristmasYearEndWindow(scanTimeUtc)) {
-    return activeLaunchWindow(
-      "Christmas / year-end thin liquidity window",
-      "Calendar: Christmas / year-end window - thin liquidity and launch noise may be elevated.",
-      "BROAD_CRYPTO",
-      "ELEVATED_NOISE"
-    );
+    return activeLaunchWindow("Christmas / Year-End Window", "Calendar: Christmas / year-end window - thin liquidity and launch noise may be elevated.", "BROAD_CRYPTO", "ELEVATED_NOISE", "NATIONAL_HOLIDAY_THEME");
   }
+
+  if (isBlackFridayCyberMondayWindow(scanTimeUtc)) return activeLaunchWindow("Black Friday / Cyber Monday", "Calendar: Black Friday / Cyber Monday - retail narrative activity may be elevated.", "BROAD_CRYPTO", "ELEVATED_NOISE", "MEME_DATE");
+  if (isHalloweenWindow(scanTimeUtc)) return activeLaunchWindow("Halloween Window 🎃", "Calendar: Halloween window - narrative launch noise may be elevated.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "MEME_DATE");
+  if (isJulyFourthWindow(scanTimeUtc)) return activeLaunchWindow("July 4th Window", "Calendar: July 4th window - institutional volume may be thin; fakeout risk context only.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "NATIONAL_HOLIDAY_THEME");
+  if (isCanadaDayWindow(scanTimeUtc)) return activeLaunchWindow("Canada Day Window", "Calendar: Canada Day window - thin liquidity and meme-launch noise may be elevated.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "NATIONAL_HOLIDAY_THEME");
+  if (isEasterWeekendWindow(scanTimeUtc)) return activeLaunchWindow("Easter Weekend 🐣", "Calendar: Easter weekend - holiday liquidity and narrative noise may be elevated.", "BROAD_CRYPTO", "ELEVATED_NOISE", "MEME_DATE");
+  if (isStPatricksWindow(scanTimeUtc)) return activeLaunchWindow("St Patrick’s Window 🍀", "Calendar: St Patrick’s window - narrative launch noise may be elevated.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "MEME_DATE");
+  if (isValentinesWindow(scanTimeUtc)) return activeLaunchWindow("Valentine’s Window 💘", "Calendar: Valentine’s window - narrative launch noise may be elevated.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "MEME_DATE");
+  if (isAprilFoolsWindow(scanTimeUtc)) return activeLaunchWindow("April Fools Window 🃏", "Calendar: April Fools window - prank and narrative noise may be elevated.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "MEME_DATE");
+  if (isCincoDeMayoWindow(scanTimeUtc)) return activeLaunchWindow("Cinco de Mayo Window", "Calendar: Cinco de Mayo window - narrative launch noise may be elevated.", "SOL_MEME_MICROCAPS", "ELEVATED_NOISE", "MEME_DATE");
 
   const nationalHoliday = holidayContext.activeHolidays.find((holiday) => holiday.type === "NATIONAL");
   if (nationalHoliday) {
@@ -134,7 +116,8 @@ export function buildLaunchWindowContext(scanTimeUtc: Date, holidayContext: Holi
       `${nationalHoliday.name} theme`,
       "Launch Window: National holiday theme - SOL meme/microcap noise may be elevated.",
       "SOL_MEME_MICROCAPS",
-      "ELEVATED_NOISE"
+      "ELEVATED_NOISE",
+      "NATIONAL_HOLIDAY_THEME"
     );
   }
 
@@ -213,6 +196,44 @@ export function isChristmasYearEndWindow(date: Date): boolean {
   return (month === 11 && day >= 24) || (month === 0 && day === 1);
 }
 
+export function isValentinesWindow(date: Date): boolean { return inMonthDayWindow(date, 1, 13, 1, 15); }
+export function isStPatricksWindow(date: Date): boolean { return inMonthDayWindow(date, 2, 16, 2, 18); }
+export function isAprilFoolsWindow(date: Date): boolean { return inMonthDayWindow(date, 2, 31, 3, 1); }
+export function isCincoDeMayoWindow(date: Date): boolean { return inMonthDayWindow(date, 4, 4, 4, 6); }
+export function isHalloweenWindow(date: Date): boolean { return inMonthDayWindow(date, 9, 30, 10, 1); }
+
+export function gregorianEasterSunday(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return utcDate(year, month - 1, day);
+}
+
+export function isEasterWeekendWindow(date: Date): boolean {
+  assertValidDate(date);
+  const easter = gregorianEasterSunday(date.getUTCFullYear());
+  const scan = utcDateOnly(date).getTime();
+  return scan >= addUtcDays(easter, -2).getTime() && scan <= addUtcDays(easter, 1).getTime();
+}
+
+export function isBlackFridayCyberMondayWindow(date: Date): boolean {
+  assertValidDate(date);
+  const thanksgiving = nthWeekdayOfMonth(date.getUTCFullYear(), 10, 4, 4);
+  const scan = utcDateOnly(date).getTime();
+  return scan >= addUtcDays(thanksgiving, 1).getTime() && scan <= addUtcDays(thanksgiving, 4).getTime();
+}
+
 function deriveCalendarLiquidityContext(
   scanTimeUtc: Date,
   holidayContext: HolidayContext,
@@ -235,11 +256,12 @@ function activeLaunchWindow(
   name: string,
   reason: string,
   affectedMarket: LaunchWindowContext["affectedMarket"],
-  risk: LaunchWindowContext["launchWindowRisk"]
+  risk: LaunchWindowContext["launchWindowRisk"],
+  type: LaunchWindowContext["launchWindowType"]
 ): LaunchWindowContext {
   return {
     launchWindowActive: true,
-    launchWindowType: "NATIONAL_HOLIDAY_THEME",
+    launchWindowType: type,
     launchWindowName: name,
     launchWindowRisk: risk,
     launchWindowReason: `${reason} Telemetry only; no score, lane, trigger, or suppression impact.`,
@@ -290,6 +312,16 @@ function toHolidayItem(candidate: HolidayCandidate, scanDate: Date): HolidayItem
 
 function holidayDefinitions(): HolidayDefinition[] {
   return [
+    { name: "Valentine’s Day", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => utcDate(year, 1, 14) },
+    { name: "St Patrick’s Day", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => utcDate(year, 2, 17) },
+    { name: "Good Friday", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => addUtcDays(gregorianEasterSunday(year), -2) },
+    { name: "Easter Sunday", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: gregorianEasterSunday },
+    { name: "Easter Monday", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => addUtcDays(gregorianEasterSunday(year), 1) },
+    { name: "April Fools", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => utcDate(year, 3, 1) },
+    { name: "Cinco de Mayo", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => utcDate(year, 4, 5) },
+    { name: "Halloween", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => utcDate(year, 9, 31) },
+    { name: "Black Friday", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => addUtcDays(nthWeekdayOfMonth(year, 10, 4, 4), 1) },
+    { name: "Cyber Monday", countryCode: "GLOBAL", type: "CULTURAL", dateForYear: (year) => addUtcDays(nthWeekdayOfMonth(year, 10, 4, 4), 4) },
     { name: "New Year's Day", countryCode: "US", type: "NATIONAL", observed: true, dateForYear: (year) => utcDate(year, 0, 1) },
     { name: "Martin Luther King Jr. Day", countryCode: "US", type: "NATIONAL", dateForYear: (year) => nthWeekdayOfMonth(year, 0, 1, 3) },
     { name: "Presidents Day", countryCode: "US", type: "NATIONAL", dateForYear: (year) => nthWeekdayOfMonth(year, 1, 1, 3) },

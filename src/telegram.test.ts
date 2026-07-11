@@ -108,9 +108,58 @@ function testContextAndExpiryRowsAreSeparate(): void {
   const moveAlert = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, context);
 
   for (const alert of [pulseAlert, moveAlert]) {
-    assert.match(alert, /<b>Context Only:<\/b> Event Stack: US Holiday \+ Expiry/);
+    assert.match(alert, /📎 <b>Context Only:<\/b>/);
+    assert.match(alert, /Expiry Window/);
+    assert.doesNotMatch(alert, /Event Stack:/);
     assert.doesNotMatch(alert, /Liquidity: US Holiday - Context Only \| Expiry:/);
+    assert.ok(alert.indexOf("<b>Context Only:</b>") > alert.indexOf("<b>Plan:</b>"));
   }
+}
+
+function testCompactDeduplicatedContextRows(): void {
+  const context = buildEventContext(new Date("2026-10-31T09:00:00Z"));
+  context.eventDisplayReasons = [
+    "Liquidity: Thin Weekend Window",
+    "Macro: FRED Context Available - Data Context Only; No Score Impact",
+    "Liquidity: Treasury Fiscaldata Available - Tga Context Only; No Score Impact",
+    "Liquidity: Net Liquidity Proxy Available - Telemetry Only"
+  ];
+  const alert = formatHeartbeatAlert(sampleResult(60), "2026-10-31T09:15:00Z", sampleResult(60), laneExplainer, context);
+
+  assert.equal((alert.match(/Weekend Liquidity/g) ?? []).length, 1);
+  assert.match(alert, /Halloween Window 🎃/);
+  assert.match(alert, /Macro: FRED Available/);
+  assert.match(alert, /Treasury: TGA Available/);
+  assert.match(alert, /Net Liquidity: Available/);
+  assert.doesNotMatch(alert, /Telemetry Only|No Score Impact|Data Context Only|Context Skipped/i);
+  assert.doesNotMatch(alert, /Fred|Tga/);
+  assert.doesNotMatch(alert, /Event Stack:/);
+}
+
+function testContextSectionOmittedWhenEmpty(): void {
+  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer);
+  assert.doesNotMatch(alert, /Context Only/);
+}
+
+function testEventStacksBecomeCompactRows(): void {
+  const scenarios = [
+    ["2026-02-14T09:00:00Z", "Valentine’s Window 💘", "New Moon Research"],
+    ["2026-03-17T09:00:00Z", "St Patrick’s Window 🍀", "Expiry + New Moon"],
+    ["2026-04-01T09:00:00Z", "April Fools Window 🃏", "Full Moon Research"],
+    ["2026-10-31T09:00:00Z", "Halloween Window 🎃", "Month-End Flows"],
+    ["2026-05-05T09:00:00Z", "Cinco de Mayo Window", "Expiry Window"]
+  ] as const;
+
+  for (const [timestamp, windowRow, compactEventRow] of scenarios) {
+    const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer, buildEventContext(new Date(timestamp)));
+    assert.match(alert, new RegExp(windowRow.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(alert, new RegExp(compactEventRow.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(alert, /Event Stack:|Holiday Today/);
+  }
+
+  const julyFourth = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer, buildEventContext(new Date("2026-07-04T09:00:00Z")));
+  assert.equal((julyFourth.match(/July 4th Window 🇺🇸/g) ?? []).length, 1);
+  assert.doesNotMatch(julyFourth, /US holiday today|Independence Day/);
 }
 
 function testFarAwayEventContextHiddenFromAlerts(): void {
@@ -139,6 +188,9 @@ function testDisplayCapitalization(): void {
 testAlphaPulseHeader();
 testMarketMoveHeaderEmojis();
 testContextAndExpiryRowsAreSeparate();
+testCompactDeduplicatedContextRows();
+testContextSectionOmittedWhenEmpty();
+testEventStacksBecomeCompactRows();
 testFarAwayEventContextHiddenFromAlerts();
 testFooterSeparatorMatchesHeader();
 testDisplayCapitalization();
