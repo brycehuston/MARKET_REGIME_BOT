@@ -111,3 +111,21 @@ The calendar, holiday, and launch-window fields are deterministic and knowable b
 ## Future Work
 
 Generic news, GDELT, status pages, DeFiLlama, token unlocks, and richer regional holiday tables are separate tasks. They should not be added to Calendar Launch Context V1.
+
+## V1.1 Cultural and Narrative Windows
+
+Calendar Launch Context V1.1 adds deterministic, known-ahead context for Valentine’s Day, St Patrick’s Day, Easter Weekend, April Fools, Cinco de Mayo, Halloween, and Black Friday / Cyber Monday. Their compact launch windows are:
+
+- Valentine’s: February 13 through February 15
+- St Patrick’s: March 16 through March 18
+- Easter Weekend: Good Friday through Easter Monday
+- April Fools: March 31 through April 1
+- Cinco de Mayo: May 4 through May 6
+- Halloween: October 30 through November 1
+- Black Friday / Cyber Monday: Black Friday through the following Cyber Monday
+
+Gregorian Easter Sunday is calculated locally with a deterministic computus algorithm. Good Friday is Easter Sunday minus two days, and Easter Monday is Easter Sunday plus one day. No API or dependency is used.
+
+US Thanksgiving remains the fourth Thursday in November. Black Friday is derived as the following day and Cyber Monday as four days after Thanksgiving.
+
+These dates and windows are context flags, not alpha claims. They remain `KNOWN_AHEAD` and telemetry-only. They do not affect score, lane scoring, Best Lane, Market Move triggers, suppression, Telegram send conditions, providers, execution, or strategy behavior.

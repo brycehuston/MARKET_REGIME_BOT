@@ -132,7 +132,7 @@ export type CalendarLiquidityContext =
   | "YEAR_END";
 export type CalendarContextRiskState = "CLEAR" | "CALENDAR_CAUTION";
 export type HolidayType = "NATIONAL" | "BANK" | "CULTURAL" | "GLOBAL" | "CRYPTO_RELEVANT";
-export type HolidayContextSource = "STATIC_CALENDAR_V1";
+export type HolidayContextSource = "STATIC_CALENDAR_V1" | "STATIC_CALENDAR_V1_1";
 export type LaunchWindowType =
   | "NONE"
   | "NATIONAL_HOLIDAY_THEME"
