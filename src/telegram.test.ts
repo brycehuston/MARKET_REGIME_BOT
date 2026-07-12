@@ -128,12 +128,25 @@ function testCompactDeduplicatedContextRows(): void {
 
   assert.equal((alert.match(/Weekend Liquidity/g) ?? []).length, 1);
   assert.match(alert, /Halloween Window 🎃/);
-  assert.match(alert, /Macro: FRED Available/);
-  assert.match(alert, /Treasury: TGA Available/);
-  assert.match(alert, /Net Liquidity: Available/);
+  assert.doesNotMatch(alert, /Macro: FRED Available/);
+  assert.doesNotMatch(alert, /Treasury: TGA Available/);
+  assert.doesNotMatch(alert, /Net Liquidity: Available/);
   assert.doesNotMatch(alert, /Telemetry Only|No Score Impact|Data Context Only|Context Skipped/i);
   assert.doesNotMatch(alert, /Fred|Tga/);
   assert.doesNotMatch(alert, /Event Stack:/);
+}
+
+function testDirectionalProviderContextCanRender(): void {
+  const context = buildEventContext(new Date("2026-07-08T09:00:00Z"));
+  context.eventDisplayReasons = [
+    "Liquidity: Net Liquidity Contracting",
+    "Liquidity: TGA Expanding",
+    "Macro: Risk Event"
+  ];
+  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer, context);
+  assert.match(alert, /Net Liquidity: Contracting/);
+  assert.match(alert, /TGA: Expanding/);
+  assert.match(alert, /Macro: Risk Event/);
 }
 
 function testContextSectionOmittedWhenEmpty(): void {
@@ -189,6 +202,7 @@ testAlphaPulseHeader();
 testMarketMoveHeaderEmojis();
 testContextAndExpiryRowsAreSeparate();
 testCompactDeduplicatedContextRows();
+testDirectionalProviderContextCanRender();
 testContextSectionOmittedWhenEmpty();
 testEventStacksBecomeCompactRows();
 testFarAwayEventContextHiddenFromAlerts();

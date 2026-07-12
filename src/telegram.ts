@@ -235,6 +235,8 @@ function formatContextSection(rows: string[]): string[] {
 
 function compactContextRow(value: string): string {
   const lower = value.toLowerCase();
+  if (lower.includes("new moon research")) return lower.includes("expiry") ? "Expiry + New Moon" : "New Moon Research";
+  if (lower.includes("full moon research")) return "Full Moon Research";
   if (lower === "event stack: holiday today + new moon research tag") return "New Moon Research";
   if (lower === "event stack: holiday today + expiry + new moon research tag") return "Expiry + New Moon";
   if (lower === "event stack: holiday today + full moon research tag") return "Full Moon Research";
@@ -259,11 +261,14 @@ function compactContextRow(value: string): string {
   if (lower.includes("cinco de mayo")) return "Cinco de Mayo Window";
   if (lower.includes("halloween")) return "Halloween Window 🎃";
   if (lower.includes("black friday") || lower.includes("cyber monday")) return "Black Friday / Cyber Monday";
-  if (lower.includes("fred") && lower.includes("unavailable")) return "Macro: FRED Unavailable";
-  if (lower.includes("fred") && lower.includes("available")) return "Macro: FRED Available";
-  if (lower.includes("treasury") && lower.includes("unavailable")) return "Treasury: TGA Unavailable";
-  if (lower.includes("treasury") && lower.includes("available")) return "Treasury: TGA Available";
-  if (lower.includes("net liquidity") && lower.includes("available")) return "Net Liquidity: Available";
+  if (lower.includes("net liquidity") && lower.includes("contracting")) return "Net Liquidity: Contracting";
+  if (lower.includes("net liquidity") && lower.includes("expanding")) return "Net Liquidity: Expanding";
+  if ((lower.includes("treasury") || lower.includes("tga")) && lower.includes("contracting")) return "TGA: Contracting";
+  if ((lower.includes("treasury") || lower.includes("tga")) && lower.includes("expanding")) return "TGA: Expanding";
+  if (lower.includes("macro") && lower.includes("risk event")) return "Macro: Risk Event";
+  if (lower.includes("fred") && (lower.includes("available") || lower.includes("unavailable"))) return "";
+  if ((lower.includes("treasury") || lower.includes("tga")) && (lower.includes("available") || lower.includes("unavailable"))) return "";
+  if (lower.includes("net liquidity") && lower.includes("available")) return "";
   if (lower.includes("global holiday") || lower.includes("holiday liquidity")) return "Holiday Liquidity";
 
   return value

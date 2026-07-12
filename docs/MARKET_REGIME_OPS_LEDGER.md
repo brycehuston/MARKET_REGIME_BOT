@@ -90,6 +90,8 @@ Progress Rules:
 
 ## Task History
 
+- 2026-07-12: On `main`, completed a formatter-only Telegram context cleanup in `src/telegram.ts` and `src/telegram.test.ts`: suppressed generic FRED/TGA/net-liquidity availability rows, normalized moon-research casing, and retained compact directional macro/liquidity rows for future telemetry. No EventContext or CalendarContext generation, score, lane, Best Lane, trigger, suppression, send-condition, provider, runtime-flow, execution, environment, staging, or commit changes. Safety mode: `LIVE_DISABLED`.
+
 - 2026-07-11: On `preview/alpha-pulse-format-examples`, expanded deterministic Calendar/Holiday/Launch Window telemetry to V1.1 and cleaned Alpha Pulse Telegram context-body formatting, including compact Event Stack mappings and runtime-relative preview Next Scan values; changed `src/calendarContext.ts`, `src/calendarContext.test.ts`, `src/types.ts`, `src/telegram.ts`, `src/telegram.test.ts`, `src/alphaPulseFormatPreview.ts`, `docs/calendar-launch-context-v1.md`, and this ledger. No score, lane, Best Lane, trigger, suppression, send-condition, provider, runtime-flow, execution, dependency, environment, staging, or commit changes. Safety mode: `LIVE_DISABLED`.
 
 - 2026-07-05: Backed out Telegram Premium Compact V2 / V2.1 display formatting from `src/telegram.ts` and `src/telegram.test.ts`, restoring the pre-V2 Telegram formatter style from `83d329b`; updated this ledger. No score math, lane math, Best Lane / If Flat / If In logic, Market Move trigger logic, heartbeat cadence, EventContext relevance policy, suppression behavior, or execution behavior changed.
@@ -127,6 +129,8 @@ Progress Rules:
 - None.
 
 ## Validation Status
+
+- 2026-07-12: Final Telegram provider-context filtering passed TypeScript no-emit compile, 13-scenario formatter preview, Telegram, EventContext, and CalendarContext tests, plus diff checks. Blocker: none. Next action: review the unstaged formatter diff; do not stage or commit without explicit approval. Safety mode remained `LIVE_DISABLED`.
 
 - 2026-07-11: Calendar V1.1 / final Telegram body cleanup validation passed: TypeScript no-emit compile, 13-scenario production formatter preview with no raw Event Stack rows, Telegram, EventContext, and CalendarContext tests, plus diff checks. Blocker: none. Next action: review the uncommitted preview output and diff; do not stage or commit without explicit approval. Safety mode remained `LIVE_DISABLED`.
 
