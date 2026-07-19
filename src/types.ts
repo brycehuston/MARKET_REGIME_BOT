@@ -334,7 +334,32 @@ export interface ActionGuidance {
   watch: string[];
 }
 
-export interface AccuracySnapshotFields {
+export type MarketDataQuality = "FRESH" | "STALE" | "FROZEN" | "PROVIDER_ERROR" | "UNKNOWN";
+
+export interface MarketDataFreshnessFields {
+  marketDataFresh: boolean;
+  marketDataStaleReason: string | null;
+  marketDataProvider: MarketDataProviderName | null;
+  marketDataProviderErrors: string[];
+  livePriceFresh: boolean;
+  livePriceAgeMinutes: number | null;
+  livePriceTimestamp: string | null;
+  livePriceProvider: MarketDataProviderName | null;
+  livePriceProviderErrors: string[];
+  livePriceUnchangedScanCount: number;
+  historicalDataFresh: boolean;
+  historicalDataAgeMinutes: number | null;
+  historicalDataTimestamp: string | null;
+  historicalDataProvider: MarketDataProviderName | null;
+  historicalDataProviderErrors: string[];
+  historicalInterval: Timeframe;
+  btcPriceChanged: boolean | null;
+  ethPriceChanged: boolean | null;
+  solPriceChanged: boolean | null;
+  marketDataQuality: MarketDataQuality;
+}
+
+export interface AccuracySnapshotFields extends MarketDataFreshnessFields {
   actionMode: ActionMode;
   confidence: string;
   regimeConfidence: RegimeConfidence;
@@ -357,6 +382,12 @@ export interface AccuracySnapshotFields {
   ethBtcRatio: number | null;
   solBtcRatio: number | null;
   solEthRatio: number | null;
+  historicalBtcPrice: number | null;
+  historicalEthPrice: number | null;
+  historicalSolPrice: number | null;
+  historicalEthBtcRatio: number | null;
+  historicalSolBtcRatio: number | null;
+  historicalSolEthRatio: number | null;
   sessionPhase: string;
   sessionElapsedMinutes: number | null;
   activityState: string;
@@ -369,7 +400,7 @@ export interface AccuracySnapshotFields {
 
 export type BestLane = "BTC" | "ETH" | "SOL" | "STABLES" | "NO_CLEAR_LANE";
 export type LaneConfidence = "Clear" | "Mixed" | "Weak" | "Unavailable";
-export type RiskStyle = "No trade" | "Scout only" | "Hold winners" | "Add only on confirmation" | "Risk-on allowed";
+export type RiskStyle = "No trade" | "Scout only" | "Hold winners" | "Add only on confirmation" | "Risk-on allowed" | "Defensive / degraded";
 export type ChopState = "Clean" | "Mixed" | "Choppy" | "Unavailable";
 
 export interface LaneExplainerHistoryPoint {
@@ -386,6 +417,13 @@ export interface LaneExplainerHistoryPoint {
   ethBtcRatio: number | null;
   solBtcRatio: number | null;
   solEthRatio: number | null;
+  livePriceTimestamp?: string | null;
+  historicalBtcPrice?: number | null;
+  historicalEthPrice?: number | null;
+  historicalSolPrice?: number | null;
+  historicalEthBtcRatio?: number | null;
+  historicalSolBtcRatio?: number | null;
+  historicalSolEthRatio?: number | null;
   bestLane?: BestLane | string | null;
 }
 
@@ -446,6 +484,14 @@ export interface LaneExplainerInput {
   ethBtcRatio: number | null;
   solBtcRatio: number | null;
   solEthRatio: number | null;
+  historicalBtcPrice?: number | null;
+  historicalEthPrice?: number | null;
+  historicalSolPrice?: number | null;
+  historicalEthBtcRatio?: number | null;
+  historicalSolBtcRatio?: number | null;
+  historicalSolEthRatio?: number | null;
+  marketDataFresh?: boolean;
+  marketDataStaleReason?: string | null;
   history: LaneExplainerHistoryPoint[];
 }
 
@@ -503,6 +549,14 @@ export interface AlertDecision {
 }
 
 export type MarketDataProviderName = "coingecko" | "bybit" | "binance";
+
+export interface LiveSpotPriceSnapshot {
+  provider: MarketDataProviderName;
+  timestamp: string;
+  btcPrice: number;
+  ethPrice: number;
+  solPrice: number;
+}
 
 export type DerivativesHeatStatus =
   | "Mixed"
@@ -633,6 +687,11 @@ export interface MarketDataSnapshot {
   timestamp: string;
   timeframe: Timeframe;
   candles: CandleBundle;
+  historicalDataProvider: MarketDataProviderName;
+  historicalDataTimestamp: string | null;
+  historicalDataProviderErrors: string[];
+  livePrices: LiveSpotPriceSnapshot;
+  livePriceProviderErrors: string[];
   global: GlobalSnapshot;
   defiConfirmation: DefiConfirmation;
 }

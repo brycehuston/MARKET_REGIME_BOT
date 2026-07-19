@@ -142,11 +142,19 @@ function normalizeLaneHistoryPoint(raw: Record<string, unknown>): LaneExplainerH
     ethBtcRatio: finiteNumber(raw.ethBtcRatio),
     solBtcRatio: finiteNumber(raw.solBtcRatio),
     solEthRatio: finiteNumber(raw.solEthRatio),
+    livePriceTimestamp: typeof raw.livePriceTimestamp === "string" ? raw.livePriceTimestamp : null,
+    historicalBtcPrice: finiteNumber(raw.historicalBtcPrice),
+    historicalEthPrice: finiteNumber(raw.historicalEthPrice),
+    historicalSolPrice: finiteNumber(raw.historicalSolPrice),
+    historicalEthBtcRatio: finiteNumber(raw.historicalEthBtcRatio),
+    historicalSolBtcRatio: finiteNumber(raw.historicalSolBtcRatio),
+    historicalSolEthRatio: finiteNumber(raw.historicalSolEthRatio),
     bestLane: typeof raw.bestLane === "string" ? raw.bestLane : null
   };
 }
 
 function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }

@@ -67,7 +67,7 @@ export function deriveLaneExplainer(input: LaneExplainerInput): LaneExplainerRes
   const invalidIf = deriveInvalidIf(input, ranking, chop);
   const timeframeRead = deriveTimeframeRead(input, ranking);
 
-  return {
+  const result: LaneExplainerResult = {
     bestLane: ranking.bestLane,
     bestLaneLabel: ranking.bestLaneLabel,
     laneConfidence: ranking.laneConfidence,
@@ -93,6 +93,24 @@ export function deriveLaneExplainer(input: LaneExplainerInput): LaneExplainerRes
     scoreRange6h: chop.scoreRange6h,
     ...ranking.returns
   };
+
+  if (input.marketDataFresh === false) {
+    return {
+      ...result,
+      bestLane: "NO_CLEAR_LANE",
+      bestLaneLabel: "Data stale",
+      laneConfidence: "Unavailable",
+      laneReason: `Market data stale: ${input.marketDataStaleReason ?? "freshness check failed"}`,
+      laneRank1: "NO_CLEAR_LANE",
+      riskStyle: "Defensive / degraded",
+      ifInAction: "Protect gains / verify manually",
+      ifFlatAction: "Wait — data stale",
+      invalidIf: "Data feed not repaired",
+      suppressionNote: "Lane read degraded because market data is stale."
+    };
+  }
+
+  return result;
 }
 
 export function deriveBestLane(input: LaneExplainerInput): LaneRankingResult {
@@ -274,24 +292,42 @@ function deriveReturns(input: LaneExplainerInput): ReturnSet {
   const point4h = nearestAtOrBefore(input.history, currentMs, 4);
   const point12h = nearestAtOrBefore(input.history, currentMs, 12);
   const point1d = nearestAtOrBefore(input.history, currentMs, 24);
+  const btcPrice = input.historicalBtcPrice ?? input.btcPrice;
+  const ethPrice = input.historicalEthPrice ?? input.ethPrice;
+  const solPrice = input.historicalSolPrice ?? input.solPrice;
+  const ethBtcRatio = input.historicalEthBtcRatio ?? input.ethBtcRatio;
+  const solBtcRatio = input.historicalSolBtcRatio ?? input.solBtcRatio;
+  const solEthRatio = input.historicalSolEthRatio ?? input.solEthRatio;
 
   return {
-    retBtc4h: roundNullable(pctChange(input.btcPrice, point4h?.btcPrice ?? null)),
-    retEth4h: roundNullable(pctChange(input.ethPrice, point4h?.ethPrice ?? null)),
-    retSol4h: roundNullable(pctChange(input.solPrice, point4h?.solPrice ?? null)),
-    retBtc12h: roundNullable(pctChange(input.btcPrice, point12h?.btcPrice ?? null)),
-    retEth12h: roundNullable(pctChange(input.ethPrice, point12h?.ethPrice ?? null)),
-    retSol12h: roundNullable(pctChange(input.solPrice, point12h?.solPrice ?? null)),
-    retBtc1d: roundNullable(pctChange(input.btcPrice, point1d?.btcPrice ?? null)),
-    retEth1d: roundNullable(pctChange(input.ethPrice, point1d?.ethPrice ?? null)),
-    retSol1d: roundNullable(pctChange(input.solPrice, point1d?.solPrice ?? null)),
-    retEthBtc4h: roundNullable(pctChange(input.ethBtcRatio, point4h?.ethBtcRatio ?? null)),
-    retSolBtc4h: roundNullable(pctChange(input.solBtcRatio, point4h?.solBtcRatio ?? null)),
-    retSolEth4h: roundNullable(pctChange(input.solEthRatio, point4h?.solEthRatio ?? null)),
-    retEthBtc1d: roundNullable(pctChange(input.ethBtcRatio, point1d?.ethBtcRatio ?? null)),
-    retSolBtc1d: roundNullable(pctChange(input.solBtcRatio, point1d?.solBtcRatio ?? null)),
-    retSolEth1d: roundNullable(pctChange(input.solEthRatio, point1d?.solEthRatio ?? null))
+    retBtc4h: roundNullable(pctChange(btcPrice, historicalPointValue(point4h, "historicalBtcPrice", "btcPrice"))),
+    retEth4h: roundNullable(pctChange(ethPrice, historicalPointValue(point4h, "historicalEthPrice", "ethPrice"))),
+    retSol4h: roundNullable(pctChange(solPrice, historicalPointValue(point4h, "historicalSolPrice", "solPrice"))),
+    retBtc12h: roundNullable(pctChange(btcPrice, historicalPointValue(point12h, "historicalBtcPrice", "btcPrice"))),
+    retEth12h: roundNullable(pctChange(ethPrice, historicalPointValue(point12h, "historicalEthPrice", "ethPrice"))),
+    retSol12h: roundNullable(pctChange(solPrice, historicalPointValue(point12h, "historicalSolPrice", "solPrice"))),
+    retBtc1d: roundNullable(pctChange(btcPrice, historicalPointValue(point1d, "historicalBtcPrice", "btcPrice"))),
+    retEth1d: roundNullable(pctChange(ethPrice, historicalPointValue(point1d, "historicalEthPrice", "ethPrice"))),
+    retSol1d: roundNullable(pctChange(solPrice, historicalPointValue(point1d, "historicalSolPrice", "solPrice"))),
+    retEthBtc4h: roundNullable(pctChange(ethBtcRatio, historicalPointValue(point4h, "historicalEthBtcRatio", "ethBtcRatio"))),
+    retSolBtc4h: roundNullable(pctChange(solBtcRatio, historicalPointValue(point4h, "historicalSolBtcRatio", "solBtcRatio"))),
+    retSolEth4h: roundNullable(pctChange(solEthRatio, historicalPointValue(point4h, "historicalSolEthRatio", "solEthRatio"))),
+    retEthBtc1d: roundNullable(pctChange(ethBtcRatio, historicalPointValue(point1d, "historicalEthBtcRatio", "ethBtcRatio"))),
+    retSolBtc1d: roundNullable(pctChange(solBtcRatio, historicalPointValue(point1d, "historicalSolBtcRatio", "solBtcRatio"))),
+    retSolEth1d: roundNullable(pctChange(solEthRatio, historicalPointValue(point1d, "historicalSolEthRatio", "solEthRatio")))
   };
+}
+
+function historicalPointValue(
+  point: LaneExplainerHistoryPoint | null,
+  historicalField: keyof LaneExplainerHistoryPoint,
+  fallbackField: keyof LaneExplainerHistoryPoint
+): number | null {
+  if (!point) return null;
+  const historical = point[historicalField];
+  if (typeof historical === "number" && Number.isFinite(historical)) return historical;
+  const fallback = point[fallbackField];
+  return typeof fallback === "number" && Number.isFinite(fallback) ? fallback : null;
 }
 
 function absoluteReturnScores(returns: ReturnSet): Map<AssetLane, number> {
@@ -496,7 +532,13 @@ function currentPoint(input: LaneExplainerInput): LaneExplainerHistoryPoint {
     solPrice: input.solPrice,
     ethBtcRatio: input.ethBtcRatio,
     solBtcRatio: input.solBtcRatio,
-    solEthRatio: input.solEthRatio
+    solEthRatio: input.solEthRatio,
+    historicalBtcPrice: input.historicalBtcPrice,
+    historicalEthPrice: input.historicalEthPrice,
+    historicalSolPrice: input.historicalSolPrice,
+    historicalEthBtcRatio: input.historicalEthBtcRatio,
+    historicalSolBtcRatio: input.historicalSolBtcRatio,
+    historicalSolEthRatio: input.historicalSolEthRatio
   };
 }
 

@@ -8,7 +8,7 @@ import {
   selectMarketMoveHeaderEmoji,
   titleCaseDisplay
 } from "./telegram";
-import { LaneExplainerResult, RegimeScoreResult } from "./types";
+import { LaneExplainerResult, MarketDataFreshnessFields, RegimeScoreResult } from "./types";
 
 function sampleResult(score: number): RegimeScoreResult {
   return {
@@ -87,6 +87,42 @@ const laneExplainer: LaneExplainerResult = {
   retSolEth1d: null
 };
 
+const staleMarketData: MarketDataFreshnessFields = {
+  marketDataFresh: false,
+  marketDataStaleReason: "Live BTC/ETH/SOL prices and provider timestamp stopped updating",
+  marketDataProvider: "coingecko",
+  marketDataProviderErrors: [],
+  livePriceFresh: false,
+  livePriceAgeMinutes: 240,
+  livePriceTimestamp: "2026-07-03T05:00:00Z",
+  livePriceProvider: "coingecko",
+  livePriceProviderErrors: [],
+  livePriceUnchangedScanCount: 4,
+  historicalDataFresh: true,
+  historicalDataAgeMinutes: 60,
+  historicalDataTimestamp: "2026-07-03T08:00:00Z",
+  historicalDataProvider: "coingecko",
+  historicalDataProviderErrors: [],
+  historicalInterval: "1d",
+  btcPriceChanged: false,
+  ethPriceChanged: false,
+  solPriceChanged: false,
+  marketDataQuality: "FROZEN"
+};
+
+const staleLaneExplainer: LaneExplainerResult = {
+  ...laneExplainer,
+  bestLane: "NO_CLEAR_LANE",
+  bestLaneLabel: "Data stale",
+  laneConfidence: "Unavailable",
+  laneReason: "Market data stale: BTC/ETH/SOL prices unchanged across multiple scans",
+  laneRank1: "NO_CLEAR_LANE",
+  riskStyle: "Defensive / degraded",
+  ifInAction: "Protect gains / verify manually",
+  ifFlatAction: "Wait — data stale",
+  invalidIf: "Data feed not repaired"
+};
+
 function testAlphaPulseHeader(): void {
   const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer);
   const lines = alert.split("\n");
@@ -100,6 +136,40 @@ function testMarketMoveHeaderEmojis(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(-4), "MOVE")[1], "\u2022  <b>MARKET \u{1F4C9} MOVE</b>  \u2022");
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(0), "MOVE")[1], "\u2022  <b>MARKET \u26A1 MOVE</b>  \u2022");
+}
+
+function testStaleMarketDataWording(): void {
+  const previousExplainerMode = process.env.ALPHA_PULSE_EXPLAINER_MODE;
+  process.env.ALPHA_PULSE_EXPLAINER_MODE = "false";
+  const pulse = formatHeartbeatAlert(
+    sampleResult(60),
+    "2026-07-03T09:15:00Z",
+    sampleResult(60),
+    staleLaneExplainer,
+    undefined,
+    staleMarketData
+  );
+  assert.match(pulse, /<b>Market Data:<\/b> Stale ⚠️/);
+  assert.match(pulse, /Read degraded — verify manually\./);
+  assert.match(pulse, /<b>Best Lane:<\/b> Data stale/);
+  assert.match(pulse, /<b>If In:<\/b> Protect gains \/ verify manually/);
+  assert.match(pulse, /<b>If Flat:<\/b> Wait — data stale/);
+  assert.doesNotMatch(pulse, /SOL leading/);
+
+  const move = formatRegimeAlert(
+    sampleResult(64),
+    "Score rose 60 -> 64",
+    "2026-07-03T09:30:00Z",
+    sampleResult(60),
+    staleLaneExplainer,
+    undefined,
+    staleMarketData
+  );
+  assert.match(move, /<b>Market Data:<\/b> Stale ⚠️/);
+  assert.match(move, /Market data is stale\. Do not trust lane\/score movement until feed repairs\./);
+  assert.doesNotMatch(move, /SOL leading/);
+  if (previousExplainerMode === undefined) delete process.env.ALPHA_PULSE_EXPLAINER_MODE;
+  else process.env.ALPHA_PULSE_EXPLAINER_MODE = previousExplainerMode;
 }
 
 function testContextAndExpiryRowsAreSeparate(): void {
@@ -200,6 +270,7 @@ function testDisplayCapitalization(): void {
 
 testAlphaPulseHeader();
 testMarketMoveHeaderEmojis();
+testStaleMarketDataWording();
 testContextAndExpiryRowsAreSeparate();
 testCompactDeduplicatedContextRows();
 testDirectionalProviderContextCanRender();

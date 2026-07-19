@@ -1,4 +1,4 @@
-import { BotConfig, Candle, GlobalSnapshot, Timeframe } from "./types";
+import { BotConfig, Candle, GlobalSnapshot, LiveSpotPriceSnapshot, Timeframe } from "./types";
 import { nowIso, safeFetchJson, round } from "./utils";
 
 export class BinanceProvider {
@@ -30,6 +30,35 @@ export class BinanceProvider {
     throw new Error(`All Binance kline endpoints failed for ${symbol} ${interval}. ${errors.join(" | ")}`);
   }
 
+  async fetchSpotPrices(symbols: { btc: string; eth: string; sol: string }): Promise<LiveSpotPriceSnapshot> {
+    const params = new URLSearchParams({ symbols: JSON.stringify([symbols.btc, symbols.eth, symbols.sol]) });
+    const errors: string[] = [];
+
+    for (const baseUrl of this.baseUrls) {
+      const normalized = baseUrl.replace(/\/$/, "");
+      try {
+        const [rows, serverTime] = await Promise.all([
+          safeFetchJson<Array<{ symbol?: string; price?: string }>>(`${normalized}/api/v3/ticker/price?${params.toString()}`),
+          safeFetchJson<{ serverTime?: number }>(`${normalized}/api/v3/time`)
+        ]);
+        const bySymbol = new Map(rows.map((row) => [row.symbol, positiveNumber(row.price)]));
+        const timestampMs = Number(serverTime.serverTime);
+        if (!Number.isFinite(timestampMs)) throw new Error("Binance server time missing.");
+        return {
+          provider: "binance",
+          timestamp: new Date(timestampMs).toISOString(),
+          btcPrice: requiredPrice(bySymbol.get(symbols.btc), symbols.btc),
+          ethPrice: requiredPrice(bySymbol.get(symbols.eth), symbols.eth),
+          solPrice: requiredPrice(bySymbol.get(symbols.sol), symbols.sol)
+        };
+      } catch (error) {
+        errors.push(`${baseUrl}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    throw new Error(`All Binance spot-price endpoints failed. ${errors.join(" | ")}`);
+  }
+
   private parseKlineRow(symbol: string, interval: string, row: unknown): Candle {
     if (!Array.isArray(row) || row.length < 8) {
       throw new Error(`Invalid Binance kline row for ${symbol}.`);
@@ -48,6 +77,13 @@ export class BinanceProvider {
       quoteVolume: Number(row[7])
     };
   }
+}
+
+interface BybitTickerResponse {
+  retCode?: number;
+  retMsg?: string;
+  time?: number;
+  result?: { list?: Array<{ symbol?: string; lastPrice?: string }> };
 }
 
 interface BybitKlineResponse {
@@ -95,6 +131,23 @@ export class BybitProvider {
       .slice(-limit);
   }
 
+  async fetchSpotPrices(symbols: { btc: string; eth: string; sol: string }): Promise<LiveSpotPriceSnapshot> {
+    const response = await safeFetchJson<BybitTickerResponse>(`${this.baseUrl}/v5/market/tickers?category=spot`);
+    if (response.retCode !== 0) {
+      throw new Error(`Bybit spot ticker failed: ${response.retMsg ?? "unknown error"} (${response.retCode ?? "no code"}).`);
+    }
+    const timestampMs = Number(response.time);
+    if (!Number.isFinite(timestampMs)) throw new Error("Bybit spot ticker timestamp missing.");
+    const bySymbol = new Map((response.result?.list ?? []).map((row) => [row.symbol, positiveNumber(row.lastPrice)]));
+    return {
+      provider: "bybit",
+      timestamp: new Date(timestampMs).toISOString(),
+      btcPrice: requiredPrice(bySymbol.get(symbols.btc), symbols.btc),
+      ethPrice: requiredPrice(bySymbol.get(symbols.eth), symbols.eth),
+      solPrice: requiredPrice(bySymbol.get(symbols.sol), symbols.sol)
+    };
+  }
+
   private parseKlineRow(symbol: string, timeframe: Timeframe, row: unknown): Candle {
     if (!Array.isArray(row) || row.length < 7) {
       throw new Error(`Invalid Bybit kline row for ${symbol}.`);
@@ -139,6 +192,8 @@ interface CoinGeckoMarketChartResponse {
   total_volumes?: unknown[];
 }
 
+type CoinGeckoSimplePriceResponse = Record<string, { usd?: number; last_updated_at?: number }>;
+
 interface ChartPoint {
   timestamp: number;
   value: number;
@@ -174,6 +229,32 @@ export class CoinGeckoProvider {
     }
 
     return candles.slice(-limit);
+  }
+
+  async fetchSpotPrices(): Promise<LiveSpotPriceSnapshot> {
+    const coinIds = ["bitcoin", "ethereum", "solana"];
+    const params = new URLSearchParams({
+      ids: coinIds.join(","),
+      vs_currencies: "usd",
+      include_last_updated_at: "true",
+      precision: "full"
+    });
+    const response = await safeFetchJson<CoinGeckoSimplePriceResponse>(
+      `${this.baseUrl}/simple/price?${params.toString()}`,
+      this.headers(),
+      15000
+    );
+    const timestamps = coinIds.map((coinId) => Number(response[coinId]?.last_updated_at) * 1000);
+    if (timestamps.some((timestamp) => !Number.isFinite(timestamp) || timestamp <= 0)) {
+      throw new Error("CoinGecko live spot response was missing last_updated_at metadata.");
+    }
+    return {
+      provider: "coingecko",
+      timestamp: new Date(Math.min(...timestamps)).toISOString(),
+      btcPrice: requiredPrice(positiveNumber(response.bitcoin?.usd), "bitcoin"),
+      ethPrice: requiredPrice(positiveNumber(response.ethereum?.usd), "ethereum"),
+      solPrice: requiredPrice(positiveNumber(response.solana?.usd), "solana")
+    };
   }
 
   async fetchGlobalSnapshot(): Promise<GlobalSnapshot> {
@@ -307,4 +388,14 @@ function timeframeToMs(timeframe: Timeframe): number {
 function numberOrNull(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function positiveNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function requiredPrice(value: number | null | undefined, symbol: string): number {
+  if (value === null || value === undefined) throw new Error(`Live spot price missing for ${symbol}.`);
+  return value;
 }
