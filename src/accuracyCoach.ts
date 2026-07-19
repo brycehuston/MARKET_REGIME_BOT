@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import dotenv from "dotenv";
 import { loadConfig } from "./config";
+import { normalizeMarketDataQuality } from "./marketDataFreshness";
 import { ensureDirForFile, pctChange, round, writeJsonFile } from "./utils";
 
 dotenv.config();
@@ -43,6 +44,12 @@ interface LaneExplainerSummary {
   note: string;
 }
 
+interface MarketDataQualitySummary {
+  counts: Record<string, number>;
+  staleFrozenSnapshotCount: number;
+  warning: string | null;
+}
+
 interface LoadSummary {
   snapshotsRead: number;
   validEnrichedSnapshots: number;
@@ -55,6 +62,7 @@ interface LoadSummary {
   };
   unknownActionModes: Record<string, number>;
   laneExplainerSummary: LaneExplainerSummary;
+  marketDataQualitySummary: MarketDataQualitySummary;
 }
 
 interface CoachEvaluation {
@@ -146,7 +154,8 @@ function loadSnapshots(filePath: string): { snapshots: CoachSnapshot[]; summary:
     duplicateTimestampsSkipped: 0,
     dateRange: { start: null, end: null },
     unknownActionModes: {},
-    laneExplainerSummary: createLaneExplainerSummary()
+    laneExplainerSummary: createLaneExplainerSummary(),
+    marketDataQualitySummary: createMarketDataQualitySummary()
   };
 
   if (!fs.existsSync(filePath)) return { snapshots: [], summary };
@@ -161,6 +170,7 @@ function loadSnapshots(filePath: string): { snapshots: CoachSnapshot[]; summary:
 
     try {
       const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      addMarketDataQualitySummary(summary.marketDataQualitySummary, parsed);
       const snapshot = normalizeSnapshot(parsed);
       if (!snapshot) {
         summary.missingRequiredFieldsSkipped += 1;
@@ -200,6 +210,19 @@ function createLaneExplainerSummary(): LaneExplainerSummary {
     solBestLaneCount: 0,
     note: "Forward lane evaluation will be added in the next phase."
   };
+}
+
+function createMarketDataQualitySummary(): MarketDataQualitySummary {
+  return { counts: {}, staleFrozenSnapshotCount: 0, warning: null };
+}
+
+function addMarketDataQualitySummary(summary: MarketDataQualitySummary, raw: Record<string, unknown>): void {
+  const quality = normalizeMarketDataQuality(raw.marketDataQuality);
+  increment(summary.counts, quality);
+  if (quality === "STALE" || quality === "FROZEN" || quality === "PROVIDER_ERROR") {
+    summary.staleFrozenSnapshotCount += 1;
+    summary.warning = "Warning: stale/frozen/provider-error snapshots exist; treat affected lane and score movement as degraded.";
+  }
 }
 
 function addLaneExplainerSummary(summary: LaneExplainerSummary, raw: Record<string, unknown>): void {
@@ -544,6 +567,9 @@ function printReport(report: CoachReport): void {
   console.log(`- missing required fields skipped: ${report.dataSummary.missingRequiredFieldsSkipped}`);
   console.log(`- matured evaluations: 1D ${report.dataSummary.maturedEvaluations["1D"]} | 3D ${report.dataSummary.maturedEvaluations["3D"]} | 7D ${report.dataSummary.maturedEvaluations["7D"]}`);
   console.log(`- date range: ${report.dataSummary.dateRange.start ?? "n/a"} to ${report.dataSummary.dateRange.end ?? "n/a"}`);
+  printCountRecord("- marketDataQuality", report.dataSummary.marketDataQualitySummary.counts);
+  console.log(`- stale/frozen/provider-error snapshots: ${report.dataSummary.marketDataQualitySummary.staleFrozenSnapshotCount}`);
+  if (report.dataSummary.marketDataQualitySummary.warning) console.log(`- ${report.dataSummary.marketDataQualitySummary.warning}`);
   console.log("");
 
   if (report.overall.totalEvaluated === 0) {

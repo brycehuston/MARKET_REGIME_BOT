@@ -1,5 +1,5 @@
 import { formatEventContextSummary } from "./eventContext";
-import { ActionGuidance, EventContext, LaneExplainerResult, LeaderName, RegimeConfidence, RegimeScoreResult } from "./types";
+import { ActionGuidance, EventContext, LaneExplainerResult, LeaderName, MarketDataFreshnessFields, RegimeConfidence, RegimeScoreResult } from "./types";
 
 const ALERT_SEPARATOR = "\u2501".repeat(22);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
@@ -57,31 +57,40 @@ export function formatRegimeAlert(
   nextScanIso?: string,
   previousResult?: RegimeScoreResult | null,
   laneExplainer?: LaneExplainerResult,
-  eventContext?: EventContext
+  eventContext?: EventContext,
+  marketData?: MarketDataFreshnessFields
 ): string {
+  const dataStale = marketData?.marketDataFresh === false;
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
   const marketActivity = defiLine(result);
-  const whyLines = buildMoveWhyLines(result, previousResult, alertReason);
-  const useExplainer = shouldUseLaneExplainer(laneExplainer);
+  const whyLines: Array<[string, string]> = dataStale
+    ? [["Data", "Market data stale"], ["Action", "Verify BTC/ETH/SOL prices manually"]]
+    : buildMoveWhyLines(result, previousResult, alertReason);
+  const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const contextRows = buildContextRows(eventContext, eventContextSummary);
-  const riskBackLines = useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
+  const riskBackLines = dataStale
+    ? ["Data feed repairs and prices are verified."]
+    : useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
   const scoreDelta = previousResult ? result.score - previousResult.score : null;
   const marketMoveEmoji = selectMarketMoveHeaderEmoji(scoreDelta, isCriticalMarketMove(result, previousResult));
   const whyIcon = scoreDelta !== null && scoreDelta > 0 ? "\u{1F4C8}" : scoreDelta !== null && scoreDelta < 0 ? "\u{1F4C9}" : "\u26A1";
   const lines = [
     ...formatHeader("MARKET", marketMoveEmoji, "MOVE"),
     "",
-    labeledLine("Alert", buildMoveAlertLabel(result, previousResult)),
-    labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
+    labeledLine("Alert", dataStale ? "Data stale — move unverified" : buildMoveAlertLabel(result, previousResult)),
+    labeledLine("Confidence", dataStale ? "Degraded — stale data" : regimeConfidenceLabel(regimeConfidence)),
+    ...(dataStale
+      ? [labeledLine("Market Data", "Stale ⚠️"), "Read degraded — verify manually."]
+      : []),
     "",
     sectionLine(whyIcon, "Why It Fired"),
     ...formatTreeRows(whyLines),
     "",
-    treeHeaderLine("\u{1F3AF}", "Plan", buildMoveActionLabel(result, guidance)),
+    treeHeaderLine("\u{1F3AF}", "Plan", dataStale ? "Protect / verify manually" : buildMoveActionLabel(result, guidance)),
     ...(useExplainer
       ? formatTreeRows([
           ["Best Lane", laneExplainer.bestLaneLabel],
@@ -95,12 +104,16 @@ export function formatRegimeAlert(
     "",
     ...formatContextSection(contextRows),
     sectionLine("\u{1F9E0}", "Read"),
-    ...formatTreeRows((useExplainer ? buildExplainerMoveReadLines(result, laneExplainer) : buildMoveReadLines(result, guidance)).map((line) => [null, line])),
+    ...formatTreeRows((dataStale
+      ? ["Market data is stale. Do not trust lane/score movement until feed repairs."]
+      : useExplainer
+        ? buildExplainerMoveReadLines(result, laneExplainer)
+        : buildMoveReadLines(result, guidance)).map((line) => [null, line])),
     "",
-    treeHeaderLine("\u{1F30A}", "Market", marketActivity ?? sentenceCase(tempoContext.activityState)),
+    treeHeaderLine("\u{1F30A}", "Market", dataStale ? "Data stale" : marketActivity ?? sentenceCase(tempoContext.activityState)),
     ...formatTreeRows([
       ["Session", formatSessionLine(tempoContext)],
-      ["Pressure", buildMovePressureLabel(result, guidance, tempoContext)],
+      ["Pressure", dataStale ? "Unverified — verify manually" : buildMovePressureLabel(result, guidance, tempoContext)],
       ["Next Scan", nextScan]
     ]),
     "",
@@ -118,23 +131,28 @@ export function formatHeartbeatAlert(
   nextScanIso: string,
   previousResult?: RegimeScoreResult | null,
   laneExplainer?: LaneExplainerResult,
-  eventContext?: EventContext
+  eventContext?: EventContext,
+  marketData?: MarketDataFreshnessFields
 ): string {
+  const dataStale = marketData?.marketDataFresh === false;
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatRelativeNextScan(nextScanIso);
   const marketActivity = defiLine(result);
-  const useExplainer = shouldUseLaneExplainer(laneExplainer);
+  const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const contextRows = buildContextRows(eventContext, eventContextSummary);
   const lines = [
     ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
     "",
-    labeledLine("Mode", premiumModeLabel(result, guidance)),
-    labeledLine("Confidence", regimeConfidenceLabel(regimeConfidence)),
+    labeledLine("Mode", dataStale ? "Data stale" : premiumModeLabel(result, guidance)),
+    labeledLine("Confidence", dataStale ? "Degraded — stale data" : regimeConfidenceLabel(regimeConfidence)),
+    ...(dataStale
+      ? [labeledLine("Market Data", "Stale ⚠️"), "Read degraded — verify manually."]
+      : []),
     "",
-    treeHeaderLine("\u{1F3AF}", "Plan", premiumHoldNowLabel(result, guidance)),
+    treeHeaderLine("\u{1F3AF}", "Plan", dataStale ? "Protect / verify manually" : premiumHoldNowLabel(result, guidance)),
     ...(useExplainer
       ? [
           treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
@@ -147,9 +165,15 @@ export function formatHeartbeatAlert(
         ]),
     "",
     ...formatContextSection(contextRows),
-    ...buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined),
+    ...(dataStale
+      ? [
+          treeHeaderLine("\u{1F30A}", "Activity", "Data stale"),
+          treeLine("\u251C\u2500", "Session", formatSessionLine(tempoContext)),
+          treeLine("\u2514\u2500", "Pressure", "Unverified — verify manually")
+        ]
+      : buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined)),
     "",
-    treeHeaderLine("\u{1F4CA}", "Score", `${result.score}/100`),
+    treeHeaderLine("\u{1F4CA}", "Score", dataStale ? `${result.score}/100 — stale input` : `${result.score}/100`),
     treeLine("\u2514\u2500", "Next Scan", nextScan),
     "",
     ...formatFooter()
@@ -176,6 +200,12 @@ function formatTreeRows(rows: Array<[string | null, string]>): string[] {
 
 export function titleCaseDisplay(value: string): string {
   if (!value) return value;
+  if ([
+    "Data stale",
+    "Protect gains / verify manually",
+    "Wait — data stale",
+    "Market data is stale. Do not trust lane/score movement until feed repairs."
+  ].includes(value)) return value;
 
   return value
     .split(/(\s+)/)
@@ -296,8 +326,8 @@ function isCriticalMarketMove(result: RegimeScoreResult, previousResult: RegimeS
   if (!previousResult) return false;
   return result.regime === "Risk-Off" || previousResult.regime === "Risk-Off";
 }
-function shouldUseLaneExplainer(laneExplainer: LaneExplainerResult | undefined): laneExplainer is LaneExplainerResult {
-  return Boolean(laneExplainer) && process.env.ALPHA_PULSE_EXPLAINER_MODE?.trim().toLowerCase() !== "false";
+function shouldUseLaneExplainer(laneExplainer: LaneExplainerResult | undefined, force = false): laneExplainer is LaneExplainerResult {
+  return Boolean(laneExplainer) && (force || process.env.ALPHA_PULSE_EXPLAINER_MODE?.trim().toLowerCase() !== "false");
 }
 
 function buildExplainerMoveReadLines(result: RegimeScoreResult, laneExplainer: LaneExplainerResult): string[] {

@@ -9,6 +9,7 @@ import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
 import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveLaneExplainer } from "./laneExplainer";
+import { assessMarketDataFreshness, LIVE_PRICE_MAX_AGE_MINUTES } from "./marketDataFreshness";
 import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
 import {
@@ -27,8 +28,10 @@ import {
   AlertDecision,
   Candle,
   CandleBundle,
+  LiveSpotPriceSnapshot,
   MarketMoveAuditFields,
   MarketDataProviderName,
+  MarketDataFreshnessFields,
   MarketDataSnapshot,
   EventContext,
   RegimeConfidence,
@@ -38,6 +41,18 @@ import {
 import { sleep } from "./utils";
 
 dotenv.config();
+
+interface CandleBundleFetchResult {
+  candles: CandleBundle;
+  provider: MarketDataProviderName;
+  providerTimestamp: string | null;
+  providerErrors: string[];
+}
+
+interface LiveSpotFetchResult {
+  prices: LiveSpotPriceSnapshot;
+  providerErrors: string[];
+}
 
 export class MarketRegimeBot {
   private readonly config = loadConfig();
@@ -89,7 +104,31 @@ export class MarketRegimeBot {
       const previousConfidence = state.currentResult ? deriveRegimeConfidence(state.currentResult, null) : null;
       const currentConfidence = deriveRegimeConfidence(result, state.currentResult);
       const decision = decideAlert(this.config, state, result, currentConfidence, previousConfidence);
-      const accuracyFields = this.buildAccuracySnapshotFields(snapshot.candles, result, guidance, state.currentResult, nextScanIso);
+      const laneHistory = loadLaneExplainerHistory(this.config);
+      const freshness = assessMarketDataFreshness({
+        timestamp: result.timestamp,
+        historicalInterval: snapshot.timeframe,
+        historicalProvider: snapshot.historicalDataProvider,
+        historicalTimestamp: snapshot.historicalDataTimestamp,
+        historicalProviderErrors: snapshot.historicalDataProviderErrors,
+        liveProvider: snapshot.livePrices.provider,
+        liveTimestamp: snapshot.livePrices.timestamp,
+        liveProviderErrors: snapshot.livePriceProviderErrors,
+        btcPrice: snapshot.livePrices.btcPrice,
+        ethPrice: snapshot.livePrices.ethPrice,
+        solPrice: snapshot.livePrices.solPrice,
+        history: laneHistory
+      });
+      console.log(`Market data freshness: ${freshness.marketDataQuality}`);
+      console.log(`Market data stale reason: ${freshness.marketDataStaleReason ?? "none"}`);
+      console.log(`Selected market data provider: ${freshness.livePriceProvider ?? "unknown"}`);
+      console.log(`Live prices: BTC ${snapshot.livePrices.btcPrice} | ETH ${snapshot.livePrices.ethPrice} | SOL ${snapshot.livePrices.solPrice}`);
+      console.log(`Live quote timestamp: ${freshness.livePriceTimestamp ?? "unknown"}`);
+      console.log(`Live-price freshness: ${freshness.livePriceFresh ? "FRESH" : "STALE"} (${freshness.livePriceAgeMinutes ?? "unknown"}m old)`);
+      console.log(`Historical candle: ${freshness.historicalDataTimestamp ?? "unknown"} | Interval: ${freshness.historicalInterval} | Provider: ${freshness.historicalDataProvider ?? "unknown"}`);
+      console.log(`Historical-data freshness: ${freshness.historicalDataFresh ? "FRESH" : "STALE"} (${freshness.historicalDataAgeMinutes ?? "unknown"}m old)`);
+      console.log(`Live unchanged scans: ${freshness.livePriceUnchangedScanCount}`);
+      const accuracyFields = this.buildAccuracySnapshotFields(snapshot.candles, snapshot.livePrices, result, guidance, state.currentResult, nextScanIso, freshness);
       const laneExplainer = deriveLaneExplainer({
         timestamp: result.timestamp,
         score: result.score,
@@ -106,7 +145,15 @@ export class MarketRegimeBot {
         ethBtcRatio: accuracyFields.ethBtcRatio,
         solBtcRatio: accuracyFields.solBtcRatio,
         solEthRatio: accuracyFields.solEthRatio,
-        history: loadLaneExplainerHistory(this.config)
+        historicalBtcPrice: accuracyFields.historicalBtcPrice,
+        historicalEthPrice: accuracyFields.historicalEthPrice,
+        historicalSolPrice: accuracyFields.historicalSolPrice,
+        historicalEthBtcRatio: accuracyFields.historicalEthBtcRatio,
+        historicalSolBtcRatio: accuracyFields.historicalSolBtcRatio,
+        historicalSolEthRatio: accuracyFields.historicalSolEthRatio,
+        marketDataFresh: freshness.marketDataFresh,
+        marketDataStaleReason: freshness.marketDataStaleReason,
+        history: laneHistory
       });
 
       logScore(this.config, result);
@@ -125,7 +172,7 @@ export class MarketRegimeBot {
           console.log("Telegram alert wanted, but TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.");
         } else {
           try {
-            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer, eventContext));
+            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness));
             telegramSent = true;
           } catch (error) {
             // Alert delivery should not stop the bot from saving state/logs.
@@ -137,7 +184,7 @@ export class MarketRegimeBot {
         }
       } else if (heartbeatWanted) {
         try {
-          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer, eventContext));
+          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness));
           heartbeatSent = true;
         } catch (error) {
           // Heartbeat delivery should not stop the bot from saving state/logs.
@@ -218,28 +265,42 @@ export class MarketRegimeBot {
     return Math.max(1000, nextBoundaryMs - from.getTime());
   }
   async fetchMarketData(timeframe: Timeframe): Promise<MarketDataSnapshot> {
-    const [candles, global, defiConfirmation] = await Promise.all([
-      this.fetchCandleBundle(timeframe),
-      this.coingecko.fetchGlobalSnapshot(),
-      this.defiLlama.fetchConfirmation()
+    const globalPromise = this.coingecko.fetchGlobalSnapshot();
+    const defiPromise = this.defiLlama.fetchConfirmation();
+    const candleFetch = await this.fetchCandleBundle(timeframe);
+    const [liveSpotFetch, global, defiConfirmation] = await Promise.all([
+      this.fetchLiveSpotPrices(candleFetch.provider),
+      globalPromise,
+      defiPromise
     ]);
 
     return {
       timestamp: new Date().toISOString(),
       timeframe,
-      candles,
+      candles: candleFetch.candles,
+      historicalDataProvider: candleFetch.provider,
+      historicalDataTimestamp: candleFetch.providerTimestamp,
+      historicalDataProviderErrors: candleFetch.providerErrors,
+      livePrices: liveSpotFetch.prices,
+      livePriceProviderErrors: liveSpotFetch.providerErrors,
       global,
       defiConfirmation
     };
   }
 
-  private async fetchCandleBundle(timeframe: Timeframe): Promise<CandleBundle> {
+  private async fetchCandleBundle(timeframe: Timeframe): Promise<CandleBundleFetchResult> {
     const providers = this.marketDataProviderOrder();
     const errors: string[] = [];
 
     for (const provider of providers) {
       try {
-        return await this.fetchCandlesFromProvider(provider, timeframe);
+        const candles = await this.fetchCandlesFromProvider(provider, timeframe);
+        return {
+          candles,
+          provider,
+          providerTimestamp: this.candleBundleProviderTimestamp(candles),
+          providerErrors: errors
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push(`${provider}: ${message}`);
@@ -255,6 +316,52 @@ export class MarketRegimeBot {
     const primary = this.config.providers.marketDataPrimary;
     const priority: MarketDataProviderName[] = ["coingecko", "bybit", "binance"];
     return [primary, ...priority.filter((provider) => provider !== primary)];
+  }
+
+  private async fetchLiveSpotPrices(preferredProvider: MarketDataProviderName): Promise<LiveSpotFetchResult> {
+    const providers = [preferredProvider, ...this.marketDataProviderOrder().filter((provider) => provider !== preferredProvider)];
+    const errors: string[] = [];
+    let staleFallback: LiveSpotPriceSnapshot | null = null;
+
+    for (const provider of providers) {
+      try {
+        const prices = await this.fetchSpotPricesFromProvider(provider);
+        const ageMinutes = (Date.now() - Date.parse(prices.timestamp)) / 60000;
+        if (!Number.isFinite(ageMinutes) || ageMinutes > LIVE_PRICE_MAX_AGE_MINUTES) {
+          staleFallback ??= prices;
+          const message = `quote timestamp ${prices.timestamp} is ${Number.isFinite(ageMinutes) ? ageMinutes.toFixed(2) : "unknown"} minutes old`;
+          errors.push(`${provider}: ${message}`);
+          const nextProvider = providers[providers.indexOf(provider) + 1];
+          if (nextProvider) console.warn(`${provider} live-price quote stale; trying ${nextProvider}. ${message}`);
+          continue;
+        }
+        console.log(`Live price provider: ${provider}`);
+        return { prices, providerErrors: errors };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`${provider}: ${message}`);
+        const nextProvider = providers[providers.indexOf(provider) + 1];
+        if (nextProvider) console.warn(`${provider} live-price fetch failed; trying ${nextProvider}. ${message}`);
+      }
+    }
+
+    if (staleFallback) {
+      console.warn(`No timestamp-current live quote was available; using stale ${staleFallback.provider} quote in degraded mode.`);
+      return { prices: staleFallback, providerErrors: errors };
+    }
+
+    throw new Error(`All live spot-price providers failed. ${errors.join(" | ")}`);
+  }
+
+  private fetchSpotPricesFromProvider(provider: MarketDataProviderName): Promise<LiveSpotPriceSnapshot> {
+    if (provider === "coingecko") return this.coingecko.fetchSpotPrices();
+    const symbols = {
+      btc: this.config.assets.btcUsdt,
+      eth: this.config.assets.ethUsdt,
+      sol: this.config.assets.solUsdt
+    };
+    if (provider === "bybit") return this.bybit.fetchSpotPrices(symbols);
+    return this.binance.fetchSpotPrices(symbols);
   }
 
   private fetchCandlesFromProvider(provider: MarketDataProviderName, timeframe: Timeframe): Promise<CandleBundle> {
@@ -373,15 +480,18 @@ export class MarketRegimeBot {
   }
   private buildAccuracySnapshotFields(
     candles: CandleBundle,
+    livePrices: LiveSpotPriceSnapshot,
     result: RegimeScoreResult,
     guidance: ReturnType<typeof getActionGuidance>,
     previousResult: RegimeScoreResult | null,
-    nextScanIso: string
+    nextScanIso: string,
+    freshness: MarketDataFreshnessFields
   ): AccuracySnapshotFields {
     const tempoContext = buildTempoTapeContext(result, previousResult);
     const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
 
     return {
+      ...freshness,
       actionMode: guidance.action,
       confidence: guidance.confidence,
       regimeConfidence,
@@ -398,12 +508,18 @@ export class MarketRegimeBot {
       btcOiChange24hPct: this.heatAssetNumber(result, "BTC", "openInterestChange24hPct"),
       ethOiChange24hPct: this.heatAssetNumber(result, "ETH", "openInterestChange24hPct"),
       solOiChange24hPct: this.heatAssetNumber(result, "SOL", "openInterestChange24hPct"),
-      btcPrice: this.latestFiniteClose(candles.btcUsdt),
-      ethPrice: this.latestFiniteClose(candles.ethUsdt),
-      solPrice: this.latestFiniteClose(candles.solUsdt),
-      ethBtcRatio: this.latestFiniteClose(candles.ethBtc),
-      solBtcRatio: this.latestFiniteClose(candles.solBtc),
-      solEthRatio: this.latestFiniteClose(candles.solEth),
+      btcPrice: livePrices.btcPrice,
+      ethPrice: livePrices.ethPrice,
+      solPrice: livePrices.solPrice,
+      ethBtcRatio: this.safeRatio(livePrices.ethPrice, livePrices.btcPrice),
+      solBtcRatio: this.safeRatio(livePrices.solPrice, livePrices.btcPrice),
+      solEthRatio: this.safeRatio(livePrices.solPrice, livePrices.ethPrice),
+      historicalBtcPrice: this.latestFiniteClose(candles.btcUsdt),
+      historicalEthPrice: this.latestFiniteClose(candles.ethUsdt),
+      historicalSolPrice: this.latestFiniteClose(candles.solUsdt),
+      historicalEthBtcRatio: this.latestFiniteClose(candles.ethBtc),
+      historicalSolBtcRatio: this.latestFiniteClose(candles.solBtc),
+      historicalSolEthRatio: this.latestFiniteClose(candles.solEth),
       sessionPhase: tempoContext.sessionPhase,
       sessionElapsedMinutes: tempoContext.sessionElapsedMinutes,
       activityState: tempoContext.activityState,
@@ -432,6 +548,19 @@ export class MarketRegimeBot {
       if (Number.isFinite(close)) return close;
     }
     return null;
+  }
+
+  private safeRatio(numerator: number, denominator: number): number | null {
+    if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
+    return numerator / denominator;
+  }
+
+  private candleBundleProviderTimestamp(candles: CandleBundle): string | null {
+    const closeTimes = [candles.btcUsdt, candles.ethUsdt, candles.solUsdt]
+      .map((series) => [...series].reverse().find((candle) => Number.isFinite(candle.close))?.closeTime ?? null);
+    if (closeTimes.some((value) => value === null)) return null;
+    const oldestCloseTime = Math.min(...closeTimes as number[]);
+    return Number.isFinite(oldestCloseTime) ? new Date(oldestCloseTime).toISOString() : null;
   }
 
   private printHeartbeat(
