@@ -1,0 +1,28 @@
+scenarioId,timestamp,confirmationTimestamp,transition,priorLeader,challenger,state,outcome,persistenceScans,requiredPersistenceScans,confirmationMargin,medianRunMargin,durationScans,durationMinutes,warningLeadMinutes,regime,chopState,botHint,broaderWindowSupport,failureReason
+2-scans-P25,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,2,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+2-scans-P25,2026-07-20T00:15:01.631Z,2026-07-20T00:30:01.201Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,2,8.45,8.45,33,479.99365,14.992833,Defensive,Choppy,true,,
+2-scans-P25,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,2,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+2-scans-P50,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,2,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+2-scans-P50,2026-07-20T00:15:01.631Z,2026-07-20T00:30:01.201Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,2,8.45,8.45,33,479.99365,14.992833,Defensive,Choppy,true,,
+2-scans-P50,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,2,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+2-scans-P75,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,2,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+2-scans-P75,2026-07-20T00:15:01.631Z,2026-07-20T00:30:01.201Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,2,8.45,8.45,33,479.99365,14.992833,Defensive,Choppy,true,,
+2-scans-P75,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,2,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+3-scans-P25,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,3,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+3-scans-P25,2026-07-20T00:15:01.631Z,2026-07-20T00:45:01.559Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,3,8.45,8.45,33,479.99365,29.9988,Defensive,Choppy,true,,
+3-scans-P25,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,3,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+3-scans-P50,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,3,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+3-scans-P50,2026-07-20T00:15:01.631Z,2026-07-20T00:45:01.559Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,3,8.45,8.45,33,479.99365,29.9988,Defensive,Choppy,true,,
+3-scans-P50,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,3,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+3-scans-P75,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,3,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+3-scans-P75,2026-07-20T00:15:01.631Z,2026-07-20T00:45:01.559Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,3,8.45,8.45,33,479.99365,29.9988,Defensive,Choppy,true,,
+3-scans-P75,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,3,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+4-scans-P25,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,4,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+4-scans-P25,2026-07-20T00:15:01.631Z,2026-07-20T01:00:01.568Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,4,8.45,8.45,33,479.99365,44.99895,Defensive,Choppy,true,,
+4-scans-P25,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,4,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+4-scans-P50,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,4,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+4-scans-P50,2026-07-20T00:15:01.631Z,2026-07-20T01:00:01.568Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,4,8.45,8.45,33,479.99365,44.99895,Defensive,Choppy,true,,
+4-scans-P50,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,4,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop
+4-scans-P75,2026-07-20T00:00:01.292Z,,BTC->SOL,BTC,SOL,ROTATION_FAILED,FAILED,1,4,,16.76,1,0,30.00325,Neutral / Chop,Mixed,false,false,Challenger held rank 1 for one scan only
+4-scans-P75,2026-07-20T00:15:01.631Z,2026-07-20T01:00:01.568Z,SOL->BTC,SOL,BTC,TAKEOVER_CONFIRMED,CONFIRMED,33,4,8.45,8.45,33,479.99365,44.99895,Defensive,Choppy,true,,
+4-scans-P75,2026-07-20T04:30:01.562Z,,BTC->STABLES,BTC,STABLES,ROTATION_FAILED,FAILED,17,4,-7.23,7.23,5,60.001317,,Defensive,Choppy,false,,Challenger improved but never cleared the margin during chop

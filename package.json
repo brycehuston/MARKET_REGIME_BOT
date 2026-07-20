@@ -10,6 +10,8 @@
     "accuracy:coach": "tsx src/accuracyCoach.ts",
     "event-context:accuracy": "tsx src/eventContextAccuracyReport.ts",
     "backtest": "tsx src/backtest.ts",
+    "lane:forensics": "tsc -p tsconfig.tools.json --noEmit && tsx tools/laneRotationForensics.ts",
+    "test:lane-forensics": "tsx tools/laneRotationForensics.test.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js --loop",
     "test:telegram": "tsx src/testTelegram.ts"
