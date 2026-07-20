@@ -7,13 +7,13 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 ## Current State
 
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
-- Current Branch: `fix/market-data-freshness-guard-v1`
-- Last Known Good Commit: `ac2087f`
-- Current Objective: Corrected Market Data Freshness Guard V1 separates timestamped live spot quotes from structural closed candles; awaiting review before any commit or deploy.
+- Current Branch: `research/lane-rotation-forensics-v1`
+- Last Known Good Commit: `f75e087`
+- Current Objective: Run read-only BTC/ETH/SOL lane-rotation forensics on explicit-fresh post-freshness-guard snapshots and collect enough data for threshold comparison.
 - Current Phase: Phase 3 - Macro/event/news context layer.
-- Current Blocker: None. EventContext relevance policy is deployed and live verified on VPS.
-- Next Best Action: Review restored pre-V2 Telegram formatter state; then let the bot collect more EventContext/relevance-policy snapshots, then review `logs/event_context_accuracy_report.md` before proposing behavioral changes.
-- Last Validation: 2026-07-19 18:45Z - Corrected live/historical freshness tests, Telegram tests, TypeScript build, timestamped CoinGecko one-shot proof, Accuracy, Accuracy Coach, and diff checks passed locally.
+- Current Blocker: Threshold selection is intentionally blocked by data sufficiency: 46 valid fresh rows are available and 54 more are required for the 100-row comparison gate.
+- Next Best Action: Review the exploratory forensic tool and reports without committing; continue collecting fresh snapshots, then re-run `npm run lane:forensics` at 100+ valid rows before selecting any detector threshold.
+- Last Validation: 2026-07-20 - Production build, 127 deterministic lane-forensics assertions, report generation, diff checks, output-scope checks, and working-tree checks passed locally.
 - Safety Mode: `LIVE_DISABLED` / alert-only. No live trading, wallets, swaps, transaction sending, private keys, or execution paths.
 
 ## Progress Board
@@ -51,6 +51,8 @@ Progress Rules:
 - [x] Verify EventContext relevance-policy snapshot fields live.
 - [ ] Let EventContext relevance policy collect enough live data for meaningful Accuracy Coach review.
 - [ ] Re-run EventContext Accuracy Coach report after more live data accumulates.
+- [x] Add read-only Lane Rotation Forensics V1 tooling and isolated reports.
+- [ ] Collect 54 more explicit-fresh snapshots and re-run the 100-row threshold comparison.
 
 ## Permanent Safety Boundaries
 
@@ -69,6 +71,8 @@ Progress Rules:
 - `README.md` - Project overview, boundaries, install/run commands, logs, and V1 notes.
 - `package.json` - Node/TypeScript scripts for one-shot runs, loop mode, accuracy, event context accuracy, backtest, build, start, and Telegram testing.
 - `src/` - Market data, regime scoring, event context, alerts, Telegram formatting, accuracy, and runtime application code.
+- `tools/laneRotationForensics.ts` - Read-only BTC/ETH/SOL/STABLES lane leadership, transition, persistence, and pre-event forensic analysis.
+- `reports/lane_rotation_forensics/` - The three generated lane-rotation forensic outputs; no runtime input or production behavior.
 - `docs/event-context-v1.md` - EventContext design and safety constraints.
 - `docs/fred-context-v1.md` - FRED macro telemetry context and backtest leakage caveats.
 - `docs/treasury-context-v1.md` - Treasury FiscalData macro-liquidity telemetry context and validation caveats.
@@ -79,6 +83,8 @@ Progress Rules:
 - `docs/MARKET_REGIME_OPS_LEDGER.md` - Fallback project state, progress, safety, validation, blocker, and next-action reference.
 
 ## Decision Log
+
+- 2026-07-20: Lane Rotation Forensics V1 is research-only. It accepts only snapshots with all four explicit freshness checks plus finite live BTC/ETH/SOL prices and BTC/ETH/SOL lane scores; legacy or unhealthy rows remain countable but cannot support thresholds. Candidate persistence windows are 2/3/4 scans and candidate margins are recalculated from P25/P50/P75 positive top-versus-runner-up margins. No threshold is selectable below 100 valid rows, and every recommendation requires implementation plus forward validation.
 
 - 2026-07-19: Superseded the unapproved equality-only frozen rule. Closed-candle equality never determines freshness. Live spot freshness now depends on provider timestamps and a five-minute cadence limit; `FROZEN` additionally requires three repeated live observations with the same old provider timestamp. Historical freshness is interval-aware (`1h`/`4h`/`1d` duration plus 15 minutes).
 - 2026-07-19: Snapshot `btcPrice`/`ethPrice`/`solPrice` and current cross-ratios now come from timestamped live spot endpoints on the existing CoinGecko, Bybit, or Binance providers. Separate `historical*Price`/ratio fields retain closed-candle inputs for structural lane returns and scoring remains closed-candle-based.
@@ -95,6 +101,8 @@ Progress Rules:
 - 2026-07-05: Suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, and execution behavior remain locked.
 
 ## Task History
+
+- 2026-07-20: On `research/lane-rotation-forensics-v1`, added `tools/laneRotationForensics.ts`, deterministic built-in-assert tests, `tsconfig.tools.json`, two package scripts, and exactly three generated reports under `reports/lane_rotation_forensics/`. The tool reads `vps_logs/regime_snapshots_post_f75e087.jsonl` without modification, excludes legacy/unhealthy/incomplete evidence, derives research-only leaders and generic transitions, evaluates 2/3/4-scan persistence against observed P25/P50/P75 margins, retains actual-time pre-event evidence, separates failed and right-censored attempts, and provides report-only Alpha Pulse/Market Move format recommendations. Dataset result: 2,302 parseable rows, 46 valid explicit-fresh rows, 2,256 legacy exclusions, zero malformed/stale-broken/missing-score exclusions, BTC 45 scans, SOL 1 scan, BTC→SOL 1 and SOL→BTC 1. No `src/`, runtime Telegram, score, lane, trigger, provider, PM2/VPS, environment, dependency, execution, or `vps_logs/` changes. No files staged, committed, or deployed. Safety mode: `LIVE_DISABLED` / alert-only.
 
 - 2026-07-19: Corrected the unapproved first Market Data Freshness Guard implementation on `fix/market-data-freshness-guard-v1`. Added timestamped free live spot fetches for CoinGecko `/simple/price`, Bybit spot tickers, and Binance spot tickers plus server time; live fetch prefers the selected historical provider and falls back across the existing provider set when fetches fail or timestamps are old. Split live-price and historical-candle freshness metadata, switched snapshot prices/current ratios to live quotes, retained separate closed-candle prices/ratios for structural returns, removed equality-only candle freezing, kept stale Telegram/lane degradation, and expanded deterministic tests. Changed `src/providers.ts`, `src/app.ts`, `src/types.ts`, `src/marketDataFreshness.ts`, `src/marketDataFreshness.test.ts`, `src/logger.ts`, `src/laneExplainer.ts`, `src/telegram.ts`, `src/telegram.test.ts`, `src/accuracyCoach.ts`, and this ledger. No regime score formulas, lane score formulas, confidence formulas, Market Move thresholds, Telegram send behavior, paid APIs, dependencies, PM2/VPS files, environment secrets, trading, wallets, signers, swaps, or transactions changed. Safety mode: `LIVE_DISABLED` / alert-only. No commit or deploy.
 
@@ -140,6 +148,8 @@ Progress Rules:
 
 ## Validation Status
 
+- 2026-07-20: Lane Rotation Forensics V1 validation passed: `npm run build`; `npm run test:lane-forensics` with 127 assertions; `npm run lane:forensics` with source `vps_logs/regime_snapshots_post_f75e087.jsonl`, 2,302 rows read, 46 valid rows, 2,256 legacy exclusions, zero malformed/stale-broken/missing-required exclusions, `EXPLORATORY_READY`, observed thresholds P25 `7.23`, P50 `8.29`, P75 `8.45`, raw transitions BTC→SOL 1 / SOL→BTC 1, one unique confirmed persistent transfer, and two unique failed candidate attempts; `git diff --check`; output scope and `src/` diff checks. Exactly three report files were generated in the approved directory. Blocker: 54 more valid rows are required before threshold selection. Next action: review only; do not commit, deploy, or implement Phase 2 without explicit approval and forward validation. Safety mode remained `LIVE_DISABLED` / alert-only.
+
 - 2026-07-19 18:45Z: Corrected Market Data Freshness Guard validation passed: `npm run build`; freshness tests proving valid unchanged `1d` and `4h` candles do not freeze, old live timestamps go stale, repeated fresh-timestamp live values remain fresh, repeated old/non-advancing live timestamps freeze, live snapshot prices differ independently from historical closes, closed fields feed structural lane returns, fallback errors do not poison a current final dataset, old quality fields normalize safely, and stale live prices degrade lanes; Telegram stale tests passed. Real `npm run once` selected CoinGecko and logged live BTC `64384.17536067605`, ETH `1858.649085271666`, SOL `75.6626028704276`, live timestamp `2026-07-19T18:45:07.000Z`, live freshness `FRESH` at `0.24m`, historical `1d` candle timestamp `2026-07-18T23:59:59.999Z`, historical freshness `FRESH` at `1125.36m`, and CoinGecko as both live and historical provider. `npm run accuracy` and `npm run accuracy:coach` passed with three valid rows and zero stale/frozen/provider-error rows. `git diff --check` passed; only intended source/docs plus pre-existing untracked `vps_logs/` remain. Blocker: none technical; user review is required before commit/deploy. Safety mode remained `LIVE_DISABLED` / alert-only.
 
 - 2026-07-19: Market Data Freshness Guard V1 validation passed: `npm run build`; `tsx src/marketDataFreshness.test.ts`; `tsx src/telegram.test.ts`; escalated `npm run once` public-network validation selected CoinGecko and logged `Market data freshness: FRESH`, `Market data stale reason: none`, and `Price stale scans: 0`; `npm run accuracy` completed with insufficient matured signals; `npm run accuracy:coach` completed with one valid fresh snapshot, `marketDataQuality: FRESH 1`, and zero stale/frozen/provider-error snapshots; `git diff --check` passed. Initial sandboxed `npm run once` could not reach public providers and the approved public-network rerun passed. Blocker: none. Limitations: a total provider outage still follows the existing fail-fast/error-log path and cannot emit a scored snapshot or Telegram alert; closed-candle feeds can conservatively enter degraded mode after the explicit three-scan/45-minute unchanged rule. Next action: review the diff and VPS-deploy the alert-only guard; do not add ETH Takeover logic until live freshness fields and stale wording are verified. Safety mode remained `LIVE_DISABLED` / alert-only.
@@ -180,4 +190,4 @@ Progress Rules:
 
 ## Next Exact Action
 
-Review the corrected live-quote/historical-candle freshness diff. Do not commit or deploy without explicit approval. After approval, verify live and historical timestamps/ages, provider fallback metadata, independent spot-vs-close prices, and degraded Telegram wording on the VPS before adding ETH Takeover logic.
+Review the Lane Rotation Forensics V1 tool and its three exploratory reports. Do not commit or deploy without explicit approval. Continue collecting explicit-fresh snapshots, then re-run `npm run lane:forensics` after at least 100 valid rows before selecting a candidate threshold or implementing Phase 2.
