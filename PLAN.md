@@ -1,0 +1,129 @@
+# Objective
+
+Preserve stable Alpha Pulse Generation 1 operation, complete legitimate loose ends, maintain reliable market snapshots and useful Telegram guidance, preserve validated scoring behavior, and prepare evidence-based future improvements.
+
+Generation 2 or a Rust rewrite is not an active objective.
+
+## Definition of Done
+
+- Current architecture and operating boundaries are documented from repository evidence.
+- Provider fallback behavior remains understood and explicit.
+- Snapshot collection, Telegram behavior, and validated scoring behavior remain preserved.
+- Known blockers and unverified runtime facts are recorded.
+- Production state can be reproduced from direct evidence when access is available.
+- No unresolved blocker prevents continued collection once the correct runtime host is verified.
+
+## Current Verified State
+
+- Last verified: 2026-07-22 documentation review.
+- Branch: `main`.
+- Commit: `b027be769dbbd6a2f94b7d4cc12adb1967a0aacc`.
+- Worktree: untracked `vps_logs/`; it is outside this work scope.
+- Runtime language: TypeScript on Node.js (`>=20`).
+- Runtime framework: direct Node/`tsx` process; `src/index.ts` starts `MarketRegimeBot`.
+- Build: `npm run build` (`tsc -p tsconfig.json`); not run for this documentation-only update.
+- Type-check: no dedicated source type-check script; build performs TypeScript compilation.
+- Tests: no aggregate test script; not run because application behavior did not change.
+- Lint: no lint script or configuration found.
+- CI: no CI configuration found.
+- Deployment method: `UNVERIFIED`; no tracked deployment script or PM2 configuration found.
+- PM2 process name: `UNVERIFIED`.
+- PM2 process status: `UNVERIFIED`.
+- Runtime safety mode: `UNVERIFIED`.
+- Production health: `UNVERIFIED`.
+- Snapshot status: local `logs/regime_snapshots.jsonl` exists; current live collection status is `UNVERIFIED`.
+- Data collection status: `UNVERIFIED`.
+- Primary blocker: direct non-secret runtime evidence from the correct host has not been collected.
+
+## Verified Architecture Boundaries
+
+- Provider-specific payloads are normalized before scoring.
+- Market-data provider fallback stays explicit and records failed attempts.
+- Freshness classification remains separate from core score calculation.
+- `scoreMarketRegime` remains separate from lane guidance and Telegram presentation.
+- EventContext, FRED, Treasury, calendar, and research telemetry are advisory unless expressly approved otherwise.
+- Telegram delivery failure must not prevent logging or state persistence.
+- Snapshots preserve source, timestamp, freshness, score, lane, alert-audit, and context fields.
+- Missing data must never be fabricated into valid scoring input.
+
+## Verified Functional Areas
+
+- Primary market data: CoinGecko, Bybit, and Binance fallback providers.
+- Enrichment: DefiLlama confirmation and optional Coinalyze derivatives heat.
+- Market scoring: trend, total market, dominance, relative-strength, and volume components.
+- Guidance: regime confidence, Best Lane, Market Move, and heartbeat.
+- Context: EventContext, FRED, Treasury FiscalData, net liquidity, calendar, holiday, launch-window, and BTC-halving telemetry.
+- Persistence: current state, score/alert CSVs, JSONL snapshots, derivatives-heat logs, and error logs.
+
+## Working Rules
+
+- Read `AGENTS.md`, this plan, Git state, and relevant implementation before editing.
+- Work only on the active item; exactly one item may be `[~]`.
+- Clear the highest-value blocker with the shortest complete and reversible path.
+- Do not add unrelated refactors, speculative abstractions, placeholders, or partial execution paths.
+- Do not alter production behavior without explicit authorization.
+- Do not expose or edit secrets, restart services, or stop collection unnecessarily.
+- Do not commit, push, or open a pull request without authorization.
+
+## Non-Negotiable Constraints
+
+- Generation 1 remains intact; no Rust rewrite during closeout.
+- No trade execution, private-key handling, wallets, swaps, orders, or transaction sending.
+- Provider failures remain explicit; missing or stale data never becomes valid scoring input.
+- EventContext remains advisory unless expressly approved.
+- Telegram formatting stays unchanged unless specifically requested.
+- Research does not enter production scoring without validation.
+- Active data collection must not be stopped unnecessarily.
+
+## Material Decisions
+
+- Existing Generation 1 remains the operational baseline.
+- Alpha Pulse is standardized before new feature work.
+- TypeScript remains appropriate for this low-frequency, API-bound service; Python remains available for research and analysis.
+- Rust is a future option only when it provides measurable benefit; a future Generation 2, if approved, is built beside Generation 1.
+- `AGENTS.md` and `PLAN.md` are the repository-control standard.
+- Current code and direct runtime evidence override stale plans, chats, and historical summaries.
+- Planning, research, and testing must remain proportional to risk and value.
+
+## Execution Plan
+
+- [x] Repository standardization and verified-state capture.
+- [~] Verify production runtime, PM2 status, and snapshot collection from the correct host without changing service behavior.
+- [ ] Continue collecting explicit-fresh snapshots if production verification confirms collection is active.
+- [ ] Re-run approved read-only EventContext and lane-forensics analysis only when their documented data gates are met.
+- [ ] Record the evidence-based Generation 1 closeout decision.
+
+## Current Action
+
+Obtain non-secret runtime evidence from the correct host to verify runtime mode, PM2 status, production health, and snapshot collection without changing service behavior.
+
+## Validation Evidence
+
+- Documentation-only standardization changed only `AGENTS.md`, `PLAN.md`, `docs/ARCHITECTURE.md`, and `docs/MARKET_REGIME_OPS_LEDGER.md`.
+- Required checks: `git diff --check`, scoped documentation diff, and `git status --short`.
+- `npm run build` is optional only when dependencies are already installed and a build baseline is required.
+- Do not run `npm run once`, `npm run dev`, `npm run start`, `npm run test:telegram`, `npm run lane:forensics`, or other provider-contacting, state-writing, Telegram-sending, or report-generating commands for this documentation-only work.
+
+## Validation Commands
+
+```powershell
+git diff --check
+git diff -- AGENTS.md PLAN.md docs/ARCHITECTURE.md docs/MARKET_REGIME_OPS_LEDGER.md
+git status --short
+```
+
+- Confirm no source, configuration, dependency, runtime, generated-data, or environment files changed.
+- Do not run deterministic tests for a documentation-only change.
+- Do not infer current production state from historical ledger entries.
+
+## Blockers
+
+- Production health, runtime safety mode, PM2 process name/status, and live snapshot collection are `UNVERIFIED` until directly checked on the correct host.
+- Historical ledger records do not establish current runtime state.
+
+## Handoff
+
+- Do not alter runtime behavior while collecting the missing evidence.
+- Record direct verification results here and in the ops ledger before starting feature work.
+- Keep `vps_logs/` outside the implementation scope unless explicitly authorized.
+- Treat direct runtime evidence as authoritative over historical ledger records.

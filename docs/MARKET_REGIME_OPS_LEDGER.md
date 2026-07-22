@@ -7,8 +7,8 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 ## Current State
 
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
-- Current Branch: `research/lane-rotation-forensics-v1`
-- Last Known Good Commit: `f75e087`
+- Current Branch: `main`
+- Last Known Good Commit: `b027be769dbbd6a2f94b7d4cc12adb1967a0aacc`
 - Current Objective: Run read-only BTC/ETH/SOL lane-rotation forensics on explicit-fresh post-freshness-guard snapshots and collect enough data for threshold comparison.
 - Current Phase: Phase 3 - Macro/event/news context layer.
 - Current Blocker: Threshold selection is intentionally blocked by data sufficiency: 46 valid fresh rows are available and 54 more are required for the 100-row comparison gate.
@@ -101,6 +101,8 @@ Progress Rules:
 - 2026-07-05: Suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, and execution behavior remain locked.
 
 ## Task History
+
+- 2026-07-22: Standardized repository control documentation on `main` at `b027be769dbbd6a2f94b7d4cc12adb1967a0aacc`. Changed only `AGENTS.md`, `PLAN.md`, `docs/ARCHITECTURE.md`, and this ledger; no source, configuration, dependency, environment, runtime, generated-data, report, or `vps_logs/` files changed. `vps_logs/` remains pre-existing and untracked. Runtime safety mode, production health, PM2 process name/status, and live snapshot collection remain `UNVERIFIED` because this task did not read `.env`, contact providers, inspect the VPS, or change services. Validation: documentation diff check, scoped diff, and Git status inspection. Blocker: direct non-secret runtime evidence from the correct host is absent. Next action: verify runtime mode, PM2 status, production health, and snapshot collection without changing service behavior. Safety mode: `UNVERIFIED` for current runtime state; code-level alert-only boundaries remain documented.
 
 - 2026-07-20: On `research/lane-rotation-forensics-v1`, added `tools/laneRotationForensics.ts`, deterministic built-in-assert tests, `tsconfig.tools.json`, two package scripts, and exactly three generated reports under `reports/lane_rotation_forensics/`. The tool reads `vps_logs/regime_snapshots_post_f75e087.jsonl` without modification, excludes legacy/unhealthy/incomplete evidence, derives research-only leaders and generic transitions, evaluates 2/3/4-scan persistence against observed P25/P50/P75 margins, retains actual-time pre-event evidence, separates failed and right-censored attempts, and provides report-only Alpha Pulse/Market Move format recommendations. Dataset result: 2,302 parseable rows, 46 valid explicit-fresh rows, 2,256 legacy exclusions, zero malformed/stale-broken/missing-score exclusions, BTC 45 scans, SOL 1 scan, BTC→SOL 1 and SOL→BTC 1. No `src/`, runtime Telegram, score, lane, trigger, provider, PM2/VPS, environment, dependency, execution, or `vps_logs/` changes. No files staged, committed, or deployed. Safety mode: `LIVE_DISABLED` / alert-only.
 
