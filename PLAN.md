@@ -35,6 +35,16 @@ Generation 2 or a Rust rewrite is not an active objective.
 - Data collection status: `ACTIVE`; latest row and all 20 recent rows were `FRESH` with live and historical freshness true.
 - Primary blocker: the offline Liquidity Rotation research evaluator has not yet measured provisional behavior across development and holdout segments.
 
+## Active Task Identity
+
+- Task ID: `AP-LR1-EVAL-01`
+- Checkpoint: `C01`
+- State: `READY`
+- Repository: `MARKET-REGIME-BOT`
+- Branch: `main`
+- Commit: `2cc32e3`
+- Resume token: `AP-LR1-EVAL-01.C01@2cc32e3`
+
 ## Verified Architecture Boundaries
 
 - Provider-specific payloads are normalized before scoring.

@@ -76,6 +76,19 @@ Correct written plans when verified evidence disagrees with them.
 - Show validation, complete diff, and status before a commit.
 - Do not commit, push, open a pull request, or rewrite shared history without authorization.
 
+## FRUX NAV Task Continuity Protocol
+
+FRUX NAV is the repository-local continuity anchor for resuming an approved task without relying on chat history.
+
+- `PLAN.md` must identify the active Task ID, Checkpoint, State, Repository, Branch, Commit, and Resume token.
+- The resume token format is `<TASK_ID>.<CHECKPOINT>@<SHORT_COMMIT>`.
+- At task start or resume, read `AGENTS.md`, `PLAN.md`, and the ops ledger; then verify the repository, branch, commit, and worktree before changing files.
+- Treat the recorded Task ID and Current Action as the authorized work scope. The continuity record does not authorize commits, pushes, deployments, service changes, or broader work.
+- Keep exactly one active `[~]` plan item and exactly one Current Action. Task identity metadata does not create another active item.
+- Advance a checkpoint or change its state only from direct repository evidence or explicit user direction. Never infer or invent checkpoint history.
+- When checkpoint evidence conflicts with the working tree, stop and record the mismatch instead of silently rewriting the continuity record.
+- At a durable handoff, update the active task identity and append concise ledger evidence while preserving completed history.
+
 ## Validation
 
 Use only commands appropriate to the change. For documentation-only work:
