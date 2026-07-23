@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, EventContext, GlobalHistoryPoint, LaneExplainerHistoryPoint, LaneExplainerSnapshotFields, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
+import { AccuracySnapshotFields, AlertDecision, BotConfig, DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, EventContext, GlobalHistoryPoint, LaneExplainerHistoryPoint, LaneExplainerSnapshotFields, LiquidityRotationTelemetry, MarketMoveAuditFields, RegimeScoreResult, SavedState } from "./types";
 import { appendCsvRow, appendLine, nowIso, readJsonFile, writeJsonFile } from "./utils";
 
 export function createDefaultState(): SavedState {
@@ -149,8 +149,15 @@ function normalizeLaneHistoryPoint(raw: Record<string, unknown>): LaneExplainerH
     historicalEthBtcRatio: finiteNumber(raw.historicalEthBtcRatio),
     historicalSolBtcRatio: finiteNumber(raw.historicalSolBtcRatio),
     historicalSolEthRatio: finiteNumber(raw.historicalSolEthRatio),
-    bestLane: typeof raw.bestLane === "string" ? raw.bestLane : null
+    bestLane: typeof raw.bestLane === "string" ? raw.bestLane : null,
+    btcDominancePct: finiteNumber((raw.global as Record<string, unknown> | undefined)?.btcDominancePct),
+    marketDataFresh: typeof raw.marketDataFresh === "boolean" ? raw.marketDataFresh : null,
+    rotationState: isLiquidityRotationState(raw.rotationState) ? raw.rotationState : null
   };
+}
+
+function isLiquidityRotationState(value: unknown): value is LaneExplainerHistoryPoint["rotationState"] {
+  return typeof value === "string" && ["MAJOR_BREAKOUT", "ROTATION_SETUP", "ALT_ROTATION_CONFIRMED", "NO_CLEAR_ROTATION", "CASCADE_RISK"].includes(value);
 }
 
 function finiteNumber(value: unknown): number | null {
@@ -293,13 +300,15 @@ export function logSnapshot(
   accuracyFields?: AccuracySnapshotFields,
   auditFields?: MarketMoveAuditFields,
   laneFields?: LaneExplainerSnapshotFields,
-  eventContext?: EventContext
+  eventContext?: EventContext,
+  liquidityRotationTelemetry?: LiquidityRotationTelemetry
 ): void {
   appendLine(config.paths.snapshotJsonl, JSON.stringify({
     ...result,
     ...accuracyFields,
     ...auditFields,
     ...laneFields,
+    ...liquidityRotationTelemetry,
     eventContext,
     calendarContext: eventContext?.calendarContext,
     holidayContextV1: eventContext?.holidayContextV1,

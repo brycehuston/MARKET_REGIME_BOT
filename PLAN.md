@@ -15,9 +15,9 @@ Generation 2 or a Rust rewrite is not an active objective.
 
 ## Current Verified State
 
-- Last verified: 2026-07-22 documentation review.
+- Last verified: 2026-07-23T00:38Z direct read-only VPS inspection.
 - Branch: `main`.
-- Commit: `b027be769dbbd6a2f94b7d4cc12adb1967a0aacc`.
+- Commit: `4c586e70e474f5e418d2a16c6e6034d92d01539c`.
 - Worktree: untracked `vps_logs/`; it is outside this work scope.
 - Runtime language: TypeScript on Node.js (`>=20`).
 - Runtime framework: direct Node/`tsx` process; `src/index.ts` starts `MarketRegimeBot`.
@@ -26,14 +26,14 @@ Generation 2 or a Rust rewrite is not an active objective.
 - Tests: no aggregate test script; not run because application behavior did not change.
 - Lint: no lint script or configuration found.
 - CI: no CI configuration found.
-- Deployment method: `UNVERIFIED`; no tracked deployment script or PM2 configuration found.
-- PM2 process name: `UNVERIFIED`.
-- PM2 process status: `UNVERIFIED`.
-- Runtime safety mode: `UNVERIFIED`.
-- Production health: `UNVERIFIED`.
-- Snapshot status: local `logs/regime_snapshots.jsonl` exists; current live collection status is `UNVERIFIED`.
-- Data collection status: `UNVERIFIED`.
-- Primary blocker: direct non-secret runtime evidence from the correct host has not been collected.
+- Deployment method: PM2 on VPS; deployed path `/home/ubuntu/MARKET-REGIME-BOT`.
+- PM2 process name: `market-regime-bot`.
+- PM2 process status: `ONLINE`; PID `1093`, uptime 13h, restarts 0 at inspection.
+- Runtime safety mode: `ALERT_ONLY_VERIFIED`.
+- Production health: `HEALTHY`.
+- Snapshot status: `ACTIVE`; `/home/ubuntu/MARKET-REGIME-BOT/logs/regime_snapshots.jsonl` had 2,520 rows, latest `2026-07-23T00:30:01.501Z`, and 20/20 recent rows parsed.
+- Data collection status: `ACTIVE`; latest row and all 20 recent rows were `FRESH` with live and historical freshness true.
+- Primary blocker: the offline Liquidity Rotation research evaluator has not yet measured provisional behavior across development and holdout segments.
 
 ## Verified Architecture Boundaries
 
@@ -88,19 +88,25 @@ Generation 2 or a Rust rewrite is not an active objective.
 ## Execution Plan
 
 - [x] Repository standardization and verified-state capture.
-- [~] Verify production runtime, PM2 status, and snapshot collection from the correct host without changing service behavior.
+- [x] Verify production runtime, PM2 status, and snapshot collection from the correct host without changing service behavior.
+- [x] Assess current explicit-fresh snapshot sufficiency for Liquidity Rotation State Machine V1 research telemetry.
+- [x] Implement research-only Liquidity Rotation State Machine V1 telemetry scaffolding.
+- [~] Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
 - [ ] Continue collecting explicit-fresh snapshots if production verification confirms collection is active.
 - [ ] Re-run approved read-only EventContext and lane-forensics analysis only when their documented data gates are met.
 - [ ] Record the evidence-based Generation 1 closeout decision.
 
 ## Current Action
 
-Obtain non-secret runtime evidence from the correct host to verify runtime mode, PM2 status, production health, and snapshot collection without changing service behavior.
+Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
 
 ## Validation Evidence
 
 - Documentation-only standardization changed only `AGENTS.md`, `PLAN.md`, `docs/ARCHITECTURE.md`, and `docs/MARKET_REGIME_OPS_LEDGER.md`.
 - Required checks: `git diff --check`, scoped documentation diff, and `git status --short`.
+- 2026-07-23 direct VPS evidence: `market-regime-bot` was online under PM2 with PID 1093, zero restarts, fresh 15-minute scans, and a current parseable JSONL snapshot stream. Historical PM2 error-log entries were last modified 2026-07-21; current scans were successful.
+- 2026-07-23 dataset gate: 2,521 rows read; 265 valid explicit-fresh rows; zero malformed, stale/broken, or missing-required exclusions. The 100-row gate is `THRESHOLD_READY`. Fresh rows span `2026-07-19T21:11:04Z` through `2026-07-23T00:45:01Z`, with a 15-minute median interval, a 30-minute continuity threshold, two contiguous segments (211 and 54 rows), and a 600-minute inter-segment gap.
+- Research-only telemetry validation passed after the fixed 30-minute continuity correction: `npx tsx src/liquidityRotation.test.ts` (35 assertions), `npx tsx src/marketDataFreshness.test.ts`, `npx tsx src/eventContext.test.ts`, `npm run test:lane-forensics` (127 assertions), and `npm run build`. The telemetry is snapshot-only and explicitly non-authoritative; it leaves score, lane, alert, Telegram, provider, and runtime paths unchanged.
 - `npm run build` is optional only when dependencies are already installed and a build baseline is required.
 - Do not run `npm run once`, `npm run dev`, `npm run start`, `npm run test:telegram`, `npm run lane:forensics`, or other provider-contacting, state-writing, Telegram-sending, or report-generating commands for this documentation-only work.
 
@@ -108,22 +114,26 @@ Obtain non-secret runtime evidence from the correct host to verify runtime mode,
 
 ```powershell
 git diff --check
-git diff -- AGENTS.md PLAN.md docs/ARCHITECTURE.md docs/MARKET_REGIME_OPS_LEDGER.md
+npx tsx src/liquidityRotation.test.ts
+npx tsx src/marketDataFreshness.test.ts
+npx tsx src/eventContext.test.ts
+npm run test:lane-forensics
+npm run build
+git diff --stat
 git status --short
 ```
 
-- Confirm no source, configuration, dependency, runtime, generated-data, or environment files changed.
-- Do not run deterministic tests for a documentation-only change.
+- Do not run `npm run once`, `npm run dev`, `npm run start`, `npm run test:telegram`, `npm run lane:forensics`, or provider-contacting, Telegram-sending, state-writing, or report-generating commands.
 - Do not infer current production state from historical ledger entries.
 
 ## Blockers
 
-- Production health, runtime safety mode, PM2 process name/status, and live snapshot collection are `UNVERIFIED` until directly checked on the correct host.
-- Historical ledger records do not establish current runtime state.
+- The dataset is sufficient for research scaffolding, but no offline evaluator has yet measured provisional state behavior across development and holdout segments.
+- Canonical TOTAL3, broad-alt universe, advances/declines, and a canonical breadth metric are unavailable; no threshold or production classification may be inferred.
 
 ## Handoff
 
-- Do not alter runtime behavior while collecting the missing evidence.
-- Record direct verification results here and in the ops ledger before starting feature work.
+- Keep Liquidity Rotation telemetry research-only and non-authoritative until the offline evaluator and forward validation provide evidence.
+- Do not alter score, lane, confidence, alert, Telegram, provider, schedule, or execution behavior while evaluating it.
 - Keep `vps_logs/` outside the implementation scope unless explicitly authorized.
 - Treat direct runtime evidence as authoritative over historical ledger records.

@@ -359,6 +359,49 @@ export interface MarketDataFreshnessFields {
   marketDataQuality: MarketDataQuality;
 }
 
+/**
+ * Research-only liquidity-rotation telemetry. These values are snapshot
+ * context, not an input to production score, lane, alert, or presentation
+ * decisions.
+ */
+export type LiquidityRotationState =
+  | "MAJOR_BREAKOUT"
+  | "ROTATION_SETUP"
+  | "ALT_ROTATION_CONFIRMED"
+  | "NO_CLEAR_ROTATION"
+  | "CASCADE_RISK";
+
+export type LiquidityRotationTrend = "UP" | "DOWN" | "FLAT" | "UNAVAILABLE";
+export type MajorExpansionState = "EXPANDING" | "CONTRACTING" | "NEUTRAL" | "UNAVAILABLE";
+export type MajorCompressionState = "UNAVAILABLE";
+export type AltBreadthState = "UNAVAILABLE";
+export type CascadeRiskState = "UNAVAILABLE";
+export type RotationConfidence = "INSUFFICIENT_DATA";
+export type RotationDataQuality = "FRESH_BUT_INSUFFICIENT" | "STALE_SOURCE";
+export type LiquidityRotationSessionWindow = "ASIA" | "LONDON" | "NEW_YORK" | "LONDON_NEW_YORK_OVERLAP" | "OFF_HOURS";
+
+export interface LiquidityRotationTelemetry {
+  majorExpansionState: MajorExpansionState;
+  majorCompressionState: MajorCompressionState;
+  btcDominanceTrend: LiquidityRotationTrend;
+  total3Trend: LiquidityRotationTrend;
+  ethBtcTrend: LiquidityRotationTrend;
+  solBtcTrend: LiquidityRotationTrend;
+  solEthTrend: LiquidityRotationTrend;
+  altBreadthState: AltBreadthState;
+  rotationState: LiquidityRotationState;
+  rotationConfidence: RotationConfidence;
+  cascadeRiskState: CascadeRiskState;
+  sessionWindow: LiquidityRotationSessionWindow;
+  sessionOverlap: boolean;
+  rotationReasons: string[];
+  rotationInvalidation: string[];
+  rotationPersistenceScans: number;
+  rotationDataQuality: RotationDataQuality;
+  rotationSchemaVersion: "liquidity-rotation-v1";
+  rotationAuthoritative: false;
+}
+
 export interface AccuracySnapshotFields extends MarketDataFreshnessFields {
   actionMode: ActionMode;
   confidence: string;
@@ -425,6 +468,9 @@ export interface LaneExplainerHistoryPoint {
   historicalSolBtcRatio?: number | null;
   historicalSolEthRatio?: number | null;
   bestLane?: BestLane | string | null;
+  btcDominancePct?: number | null;
+  marketDataFresh?: boolean | null;
+  rotationState?: LiquidityRotationState | null;
 }
 
 export interface LaneExplainerSnapshotFields {

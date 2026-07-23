@@ -9,6 +9,7 @@ import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
 import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveLaneExplainer } from "./laneExplainer";
+import { deriveLiquidityRotationTelemetry } from "./liquidityRotation";
 import { assessMarketDataFreshness, LIVE_PRICE_MAX_AGE_MINUTES } from "./marketDataFreshness";
 import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
@@ -129,6 +130,15 @@ export class MarketRegimeBot {
       console.log(`Historical-data freshness: ${freshness.historicalDataFresh ? "FRESH" : "STALE"} (${freshness.historicalDataAgeMinutes ?? "unknown"}m old)`);
       console.log(`Live unchanged scans: ${freshness.livePriceUnchangedScanCount}`);
       const accuracyFields = this.buildAccuracySnapshotFields(snapshot.candles, snapshot.livePrices, result, guidance, state.currentResult, nextScanIso, freshness);
+      const liquidityRotationTelemetry = deriveLiquidityRotationTelemetry({
+        timestamp: result.timestamp,
+        global: result.global,
+        freshness,
+        ethBtcRatio: accuracyFields.ethBtcRatio,
+        solBtcRatio: accuracyFields.solBtcRatio,
+        solEthRatio: accuracyFields.solEthRatio,
+        history: laneHistory
+      });
       const laneExplainer = deriveLaneExplainer({
         timestamp: result.timestamp,
         score: result.score,
@@ -208,7 +218,7 @@ export class MarketRegimeBot {
         currentConfidence,
         eventContext
       );
-      logSnapshot(this.config, result, accuracyFields, auditFields, laneExplainer, eventContext);
+      logSnapshot(this.config, result, accuracyFields, auditFields, laneExplainer, eventContext, liquidityRotationTelemetry);
 
       const nextState = updateStateAfterRun(state, result, decision, heartbeatSent);
       saveState(this.config, nextState);
