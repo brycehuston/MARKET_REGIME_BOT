@@ -17,7 +17,7 @@ Generation 2 or a Rust rewrite is not an active objective.
 
 - Last verified: 2026-07-23T00:38Z direct read-only VPS inspection.
 - Branch: `main`.
-- Commit: `4c586e70e474f5e418d2a16c6e6034d92d01539c`.
+- Commit: `94ebe1c`.
 - Worktree: untracked `vps_logs/`; it is outside this work scope.
 - Runtime language: TypeScript on Node.js (`>=20`).
 - Runtime framework: direct Node/`tsx` process; `src/index.ts` starts `MarketRegimeBot`.
@@ -33,17 +33,17 @@ Generation 2 or a Rust rewrite is not an active objective.
 - Production health: `HEALTHY`.
 - Snapshot status: `ACTIVE`; `/home/ubuntu/MARKET-REGIME-BOT/logs/regime_snapshots.jsonl` had 2,520 rows, latest `2026-07-23T00:30:01.501Z`, and 20/20 recent rows parsed.
 - Data collection status: `ACTIVE`; latest row and all 20 recent rows were `FRESH` with live and historical freshness true.
-- Primary blocker: the offline Liquidity Rotation research evaluator has not yet measured provisional behavior across development and holdout segments.
+- Primary blocker: untouched holdout evidence has only seven mature candidate outcomes and zero `ALT_ROTATION_CONFIRMED` observations.
 
 ## Active Task Identity
 
 - Task ID: `AP-LR1-EVAL-01`
-- Checkpoint: `C01`
-- State: `READY`
+- Checkpoint: `C02`
+- State: `VERIFIED`
 - Repository: `MARKET-REGIME-BOT`
 - Branch: `main`
-- Commit: `2cc32e3`
-- Resume token: `AP-LR1-EVAL-01.C01@2cc32e3`
+- Commit: `94ebe1c`
+- Resume token: `AP-LR1-EVAL-01.C02@94ebe1c`
 
 ## Verified Architecture Boundaries
 
@@ -101,14 +101,14 @@ Generation 2 or a Rust rewrite is not an active objective.
 - [x] Verify production runtime, PM2 status, and snapshot collection from the correct host without changing service behavior.
 - [x] Assess current explicit-fresh snapshot sufficiency for Liquidity Rotation State Machine V1 research telemetry.
 - [x] Implement research-only Liquidity Rotation State Machine V1 telemetry scaffolding.
-- [~] Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
-- [ ] Continue collecting explicit-fresh snapshots if production verification confirms collection is active.
+- [x] Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
+- [~] Continue research-only forward-shadow snapshot collection until the untouched holdout contains at least 10 mature candidate outcomes and two `ALT_ROTATION_CONFIRMED` observations, then rerun the evaluator without retuning development rules.
 - [ ] Re-run approved read-only EventContext and lane-forensics analysis only when their documented data gates are met.
 - [ ] Record the evidence-based Generation 1 closeout decision.
 
 ## Current Action
 
-Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
+Continue research-only forward-shadow snapshot collection until the untouched holdout contains at least 10 mature candidate outcomes and two `ALT_ROTATION_CONFIRMED` observations, then rerun the evaluator without retuning development rules.
 
 ## Validation Evidence
 
@@ -117,6 +117,7 @@ Build the offline Liquidity Rotation research evaluator and measure provisional 
 - 2026-07-23 direct VPS evidence: `market-regime-bot` was online under PM2 with PID 1093, zero restarts, fresh 15-minute scans, and a current parseable JSONL snapshot stream. Historical PM2 error-log entries were last modified 2026-07-21; current scans were successful.
 - 2026-07-23 dataset gate: 2,521 rows read; 265 valid explicit-fresh rows; zero malformed, stale/broken, or missing-required exclusions. The 100-row gate is `THRESHOLD_READY`. Fresh rows span `2026-07-19T21:11:04Z` through `2026-07-23T00:45:01Z`, with a 15-minute median interval, a 30-minute continuity threshold, two contiguous segments (211 and 54 rows), and a 600-minute inter-segment gap.
 - Research-only telemetry validation passed after the fixed 30-minute continuity correction: `npx tsx src/liquidityRotation.test.ts` (35 assertions), `npx tsx src/marketDataFreshness.test.ts`, `npx tsx src/eventContext.test.ts`, `npm run test:lane-forensics` (127 assertions), and `npm run build`. The telemetry is snapshot-only and explicitly non-authoritative; it leaves score, lane, alert, Telegram, provider, and runtime paths unchanged.
+- Offline evaluator validation passed at FRUX NAV checkpoint `C02`: 50 evaluator assertions plus tool type-check, existing deterministic tests, and production build. Development used the complete 211-row first segment; the untouched 54-row second segment was excluded from tuning. Development-derived rules produced 26 mature candidate outcomes (15 successes, 11 false positives); holdout produced seven mature candidate outcomes (three successes, four false positives), one right-censored setup, and zero `ALT_ROTATION_CONFIRMED` observations. Verdict: `INSUFFICIENT_EVIDENCE`.
 - `npm run build` is optional only when dependencies are already installed and a build baseline is required.
 - Do not run `npm run once`, `npm run dev`, `npm run start`, `npm run test:telegram`, `npm run lane:forensics`, or other provider-contacting, state-writing, Telegram-sending, or report-generating commands for this documentation-only work.
 
@@ -124,6 +125,7 @@ Build the offline Liquidity Rotation research evaluator and measure provisional 
 
 ```powershell
 git diff --check
+npx tsx tools/liquidityRotationEvaluator.test.ts
 npx tsx src/liquidityRotation.test.ts
 npx tsx src/marketDataFreshness.test.ts
 npx tsx src/eventContext.test.ts
@@ -138,12 +140,12 @@ git status --short
 
 ## Blockers
 
-- The dataset is sufficient for research scaffolding, but no offline evaluator has yet measured provisional state behavior across development and holdout segments.
+- Untouched holdout evidence is below the evaluator gate: seven mature candidate outcomes versus 10 required, and zero `ALT_ROTATION_CONFIRMED` observations versus two required.
 - Canonical TOTAL3, broad-alt universe, advances/declines, and a canonical breadth metric are unavailable; no threshold or production classification may be inferred.
 
 ## Handoff
 
-- Keep Liquidity Rotation telemetry research-only and non-authoritative until the offline evaluator and forward validation provide evidence.
+- Keep Liquidity Rotation telemetry and evaluator output research-only and non-authoritative; `INSUFFICIENT_EVIDENCE` does not permit production activation.
 - Do not alter score, lane, confidence, alert, Telegram, provider, schedule, or execution behavior while evaluating it.
 - Keep `vps_logs/` outside the implementation scope unless explicitly authorized.
 - Treat direct runtime evidence as authoritative over historical ledger records.

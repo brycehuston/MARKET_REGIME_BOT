@@ -8,12 +8,12 @@ Give a fast, reliable market pulse: what the market regime is, what conditions m
 
 - Status: Active development; alert-only market regime bot with documented runtime boundaries.
 - Current Branch: `main`
-- Last Known Good Commit: `4c586e70e474f5e418d2a16c6e6034d92d01539c`
-- Current Objective: Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
+- Last Known Good Commit: `94ebe1c`
+- Current Objective: Continue research-only forward-shadow collection until the untouched holdout reaches the evaluator evidence gate.
 - Current Phase: Phase 3 - Macro/event/news context layer.
-- Current Blocker: The offline evaluator has not yet measured provisional rotation-state behavior across the approved development and holdout segments.
-- Next Best Action: Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
-- Last Validation: 2026-07-23 - Fixed 30-minute continuity tests (35 assertions), existing freshness/EventContext/forensics tests, and `npm run build` passed; no runtime or VPS action occurred.
+- Current Blocker: Untouched holdout contains seven mature candidate outcomes and zero `ALT_ROTATION_CONFIRMED` observations; the research gate requires at least 10 and two respectively.
+- Next Best Action: Continue research-only forward-shadow snapshot collection until the untouched holdout contains at least 10 mature candidate outcomes and two `ALT_ROTATION_CONFIRMED` observations, then rerun the evaluator without retuning development rules.
+- Last Validation: 2026-07-23 - Offline evaluator tests (50 assertions), tool type-check, existing deterministic tests, production build, and approved 2,521-row evaluation passed. Verdict: `INSUFFICIENT_EVIDENCE`.
 - Runtime Safety Mode: `ALERT_ONLY_VERIFIED`. PM2 ran `/home/ubuntu/MARKET-REGIME-BOT/dist/index.js --loop`; the deployed README directly documents alert-only operation with no live trading, wallet, private-key, swap, transaction-sending, or execution paths.
 
 ## Progress Board
@@ -101,6 +101,8 @@ Progress Rules:
 - 2026-07-05: Suppression, scoring changes, lane changes, Market Move trigger changes, heartbeat changes, and execution behavior remain locked.
 
 ## Task History
+
+- 2026-07-23: Advanced FRUX NAV task `AP-LR1-EVAL-01` from checkpoint `C01` to verified checkpoint `C02` on `main` at base commit `94ebe1c`; resume token `AP-LR1-EVAL-01.C02@94ebe1c`. Added the read-only, deterministic offline evaluator and tests in `tools/liquidityRotationEvaluator.ts` and `tools/liquidityRotationEvaluator.test.ts`, plus four generated reports under `reports/liquidity_rotation_v1/`. The approved 2,521-row snapshot cutoff was read without modifying its source; eligibility reproduced 265 explicit-fresh rows, zero malformed/stale-broken/missing-required exclusions, 2,256 legacy exclusions, zero duplicate timestamps, and two fixed-continuity segments of 211 and 54 rows separated by 600 minutes. The complete first segment was development and the complete second segment was untouched holdout; holdout was not used for tuning. One non-authoritative rule set was derived only from development: score high/low 53/41, BTC breakout/cascade one-scan returns 0.152103%/-0.162425%, alt margin 13.77, and two-scan alt persistence. Development had 26 mature candidate outcomes, 15 successes, and 11 false positives; holdout had seven mature candidate outcomes, three successes, four false positives, one right-censored setup, and zero `ALT_ROTATION_CONFIRMED` observations. Verdict: `INSUFFICIENT_EVIDENCE`. TOTAL3 and broad-alt breadth remain `UNAVAILABLE`. Validation passed: evaluator tests (50 assertions), tool type-check, Liquidity Rotation tests (35 assertions), freshness tests, EventContext tests, lane-forensics tests (127 assertions), and `npm run build`. Reports follow the repository's tracked research-report convention but remain untracked pending review because nothing was staged or committed. No production score, lane, confidence, alert, Telegram, provider, schedule, runtime, execution, environment, `vps_logs/`, VPS, PM2, staging, commit, push, deployment, or service behavior changed. Exactly one next action: continue research-only forward-shadow collection until holdout reaches at least 10 mature candidate outcomes and two `ALT_ROTATION_CONFIRMED` observations, then rerun without retuning development rules.
 
 - 2026-07-23: Adopted the FRUX NAV Task Continuity Protocol for active task `AP-LR1-EVAL-01` at checkpoint `C01`, resume token `AP-LR1-EVAL-01.C01@2cc32e3`. No runtime or production behavior changed.
 
