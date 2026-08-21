@@ -1,10 +1,10 @@
 import { buildEventContext } from "./eventContext";
-import { formatHeartbeatAlert, formatRegimeAlert } from "./telegram";
-import { LaneExplainerResult, RegimeName, RegimeScoreResult } from "./types";
+import { AlphaPulseMajorsInput, formatHeartbeatAlert } from "./telegram";
+import { LaneExplainerHistoryPoint, LaneExplainerResult, MarketDataFreshnessFields, RegimeName, RegimeScoreResult } from "./types";
 
-function sampleResult(score: number, regime: RegimeName = "Neutral / Chop"): RegimeScoreResult {
+function sampleResult(score: number, regime: RegimeName = "Neutral / Chop", timestamp = "2026-07-08T19:00:00Z"): RegimeScoreResult {
   return {
-    timestamp: "2026-07-08T19:00:00Z",
+    timestamp,
     timeframe: "1h",
     score,
     regime,
@@ -19,7 +19,7 @@ function sampleResult(score: number, regime: RegimeName = "Neutral / Chop"): Reg
       { name: "SOL/ETH relative strength", score: 0, min: -10, max: 10, label: "Flat", reason: "fixture" }
     ],
     global: {
-      timestamp: "2026-07-08T19:00:00Z",
+      timestamp,
       totalMarketCapUsd: null,
       totalMarketCapChange24hPct: null,
       btcDominancePct: null,
@@ -98,40 +98,105 @@ function previewNextScanIso(): string {
   return new Date(Date.now() + 15 * 60_000).toISOString();
 }
 
-const heartbeatScenarios = [
-  ["HEARTBEAT / NORMAL DAY", "2026-07-08T19:00:00Z"],
-  ["HEARTBEAT / WEEKEND", "2026-07-11T19:00:00Z"],
-  ["HEARTBEAT / CANADA DAY WINDOW", "2026-07-01T19:00:00Z"],
-  ["HEARTBEAT / JULY 4TH WINDOW", "2026-07-04T19:00:00Z"],
-  ["HEARTBEAT / VALENTINE’S WINDOW", "2026-02-14T19:00:00Z"],
-  ["HEARTBEAT / ST PATRICK’S WINDOW", "2026-03-17T19:00:00Z"],
-  ["HEARTBEAT / EASTER WEEKEND", "2026-04-05T19:00:00Z"],
-  ["HEARTBEAT / APRIL FOOLS WINDOW", "2026-04-01T19:00:00Z"],
-  ["HEARTBEAT / CINCO DE MAYO WINDOW", "2026-05-05T19:00:00Z"],
-  ["HEARTBEAT / HALLOWEEN WINDOW", "2026-10-31T19:00:00Z"],
-  ["HEARTBEAT / BLACK FRIDAY CYBER MONDAY", "2026-11-27T19:00:00Z"]
-] as const;
-
-for (const [name, timestamp] of heartbeatScenarios) {
-  const result = sampleResult(60);
-  result.timestamp = timestamp;
-  result.global.timestamp = timestamp;
-  printScenario(
-    name,
-    formatHeartbeatAlert(result, previewNextScanIso(), result, laneExplainer, buildEventContext(new Date(timestamp)))
-  );
+function freshness(timestamp: string, fresh: boolean): MarketDataFreshnessFields {
+  return {
+    marketDataFresh: fresh,
+    marketDataStaleReason: fresh ? null : "Live BTC/ETH/SOL prices stopped updating",
+    marketDataProvider: "coingecko",
+    marketDataProviderErrors: [],
+    livePriceFresh: fresh,
+    livePriceAgeMinutes: fresh ? 0 : 240,
+    livePriceTimestamp: timestamp,
+    livePriceProvider: "coingecko",
+    livePriceProviderErrors: [],
+    livePriceUnchangedScanCount: fresh ? 0 : 4,
+    historicalDataFresh: true,
+    historicalDataAgeMinutes: 60,
+    historicalDataTimestamp: new Date(Date.parse(timestamp) - 60 * 60_000).toISOString(),
+    historicalDataProvider: "coingecko",
+    historicalDataProviderErrors: [],
+    historicalInterval: "1d",
+    btcPriceChanged: fresh,
+    ethPriceChanged: fresh,
+    solPriceChanged: fresh,
+    marketDataQuality: fresh ? "FRESH" : "FROZEN"
+  };
 }
 
-const neutral = sampleResult(52, "Neutral / Chop");
-const riskOn = sampleResult(68, "Risk-On");
-printScenario(
-  "MARKET MOVE / RISK-ON IMPROVEMENT",
-  formatRegimeAlert(riskOn, "Score rose 52 -> 68", previewNextScanIso(), neutral, laneExplainer)
-);
+function historyPoint(timestamp: string, btcPrice: number, ethPrice: number, solPrice: number): LaneExplainerHistoryPoint {
+  return {
+    timestamp,
+    timestampMs: Date.parse(timestamp),
+    score: 60,
+    regime: "Neutral / Chop",
+    leader: "SOL-led",
+    regimeConfidence: "Noisy",
+    marketMoveReason: null,
+    btcPrice,
+    ethPrice,
+    solPrice,
+    ethBtcRatio: null,
+    solBtcRatio: null,
+    solEthRatio: null,
+    livePriceTimestamp: timestamp,
+    bestLane: "SOL",
+    marketDataFresh: true
+  };
+}
 
-const stronger = sampleResult(70, "Risk-On");
-const riskOff = sampleResult(34, "Risk-Off");
-printScenario(
-  "MARKET MOVE / RISK-OFF DETERIORATION",
-  formatRegimeAlert(riskOff, "Score fell 70 -> 34", previewNextScanIso(), stronger, laneExplainer)
-);
+function majors(timestamp: string, current: [number, number, number], prior: [number, number, number], fresh = true): AlphaPulseMajorsInput {
+  const priorTimestamp = new Date(Date.parse(timestamp) - 60 * 60_000).toISOString();
+  return {
+    timestamp,
+    livePriceTimestamp: timestamp,
+    marketDataFresh: fresh,
+    scanIntervalMinutes: 15,
+    btcPrice: current[0],
+    ethPrice: current[1],
+    solPrice: current[2],
+    history: [historyPoint(priorTimestamp, prior[0], prior[1], prior[2])]
+  };
+}
+
+const normalTimestamp = "2026-07-08T19:00:00Z";
+const normal = sampleResult(70, "Risk-On", normalTimestamp);
+printScenario("ALPHA PULSE / RISK-ON / NORMAL CONTEXT", formatHeartbeatAlert(
+  normal,
+  previewNextScanIso(),
+  normal,
+  laneExplainer,
+  buildEventContext(new Date(normalTimestamp)),
+  freshness(normalTimestamp, true),
+  majors(normalTimestamp, [60_600, 2_016, 103.4], [60_000, 2_000, 100])
+));
+
+const weekendTimestamp = "2026-07-11T19:00:00Z";
+const weekend = sampleResult(58, "Neutral / Chop", weekendTimestamp);
+printScenario("ALPHA PULSE / CHOPPY / WEEKEND CONTEXT", formatHeartbeatAlert(
+  weekend,
+  previewNextScanIso(),
+  weekend,
+  laneExplainer,
+  buildEventContext(new Date(weekendTimestamp)),
+  freshness(weekendTimestamp, true),
+  majors(weekendTimestamp, [59_700, 1_984, 98.3], [60_000, 2_000, 100])
+));
+
+const degradedTimestamp = "2026-07-08T19:00:00Z";
+const degraded = sampleResult(42, "Risk-Off", degradedTimestamp);
+const degradedLane = {
+  ...laneExplainer,
+  bestLane: "NO_CLEAR_LANE" as const,
+  bestLaneLabel: "Data stale",
+  ifInAction: "Protect gains / verify manually",
+  ifFlatAction: "Wait — data stale"
+};
+printScenario("ALPHA PULSE / DEGRADED OPTIONAL DATA", formatHeartbeatAlert(
+  degraded,
+  previewNextScanIso(),
+  degraded,
+  degradedLane,
+  undefined,
+  freshness(degradedTimestamp, false),
+  majors(degradedTimestamp, [60_000, 2_000, 100], [60_000, 2_000, 100], false)
+));

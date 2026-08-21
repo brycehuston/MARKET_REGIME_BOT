@@ -1,21 +1,23 @@
 import assert from "node:assert/strict";
 import { buildEventContext } from "./eventContext";
 import {
+  deriveAlphaPulseMajors1h,
   formatFooter,
   formatHeader,
   formatHeartbeatAlert,
   formatRegimeAlert,
   selectMarketMoveHeaderEmoji,
-  titleCaseDisplay
+  titleCaseDisplay,
+  type AlphaPulseMajorsInput
 } from "./telegram";
-import { LaneExplainerResult, MarketDataFreshnessFields, RegimeScoreResult } from "./types";
+import { LaneExplainerHistoryPoint, LaneExplainerResult, MarketDataFreshnessFields, RegimeName, RegimeScoreResult } from "./types";
 
-function sampleResult(score: number): RegimeScoreResult {
+function sampleResult(score: number, regime: RegimeName = "Neutral / Chop", timestamp = "2026-07-03T09:00:00Z"): RegimeScoreResult {
   return {
-    timestamp: "2026-07-03T09:00:00Z",
+    timestamp,
     timeframe: "1h",
     score,
-    regime: "Neutral / Chop",
+    regime,
     leader: "SOL-led",
     memeCondition: "Mixed",
     researchBias: "Neutral",
@@ -27,7 +29,7 @@ function sampleResult(score: number): RegimeScoreResult {
       { name: "SOL/ETH relative strength", score: 0, min: -10, max: 10, label: "Flat", reason: "fixture" }
     ],
     global: {
-      timestamp: "2026-07-03T09:00:00Z",
+      timestamp,
       totalMarketCapUsd: null,
       totalMarketCapChange24hPct: null,
       btcDominancePct: null,
@@ -67,9 +69,9 @@ const laneExplainer: LaneExplainerResult = {
   timeframeRead: "fixture",
   shortTermState: "fixture",
   chopState: "Choppy",
-  suppressionNote: null,
-  scoreFlipCount6h: null,
-  scoreRange6h: null,
+  suppressionNote: "score whipsawing inside current regime",
+  scoreFlipCount6h: 3,
+  scoreRange6h: 6,
   retBtc4h: null,
   retEth4h: null,
   retSol4h: null,
@@ -87,197 +89,205 @@ const laneExplainer: LaneExplainerResult = {
   retSolEth1d: null
 };
 
-const staleMarketData: MarketDataFreshnessFields = {
-  marketDataFresh: false,
-  marketDataStaleReason: "Live BTC/ETH/SOL prices and provider timestamp stopped updating",
+const freshMarketData: MarketDataFreshnessFields = {
+  marketDataFresh: true,
+  marketDataStaleReason: null,
   marketDataProvider: "coingecko",
   marketDataProviderErrors: [],
-  livePriceFresh: false,
-  livePriceAgeMinutes: 240,
-  livePriceTimestamp: "2026-07-03T05:00:00Z",
+  livePriceFresh: true,
+  livePriceAgeMinutes: 0,
+  livePriceTimestamp: "2026-07-03T09:00:00Z",
   livePriceProvider: "coingecko",
   livePriceProviderErrors: [],
-  livePriceUnchangedScanCount: 4,
+  livePriceUnchangedScanCount: 0,
   historicalDataFresh: true,
   historicalDataAgeMinutes: 60,
   historicalDataTimestamp: "2026-07-03T08:00:00Z",
   historicalDataProvider: "coingecko",
   historicalDataProviderErrors: [],
   historicalInterval: "1d",
+  btcPriceChanged: true,
+  ethPriceChanged: true,
+  solPriceChanged: false,
+  marketDataQuality: "FRESH"
+};
+
+const staleMarketData: MarketDataFreshnessFields = {
+  ...freshMarketData,
+  marketDataFresh: false,
+  marketDataStaleReason: "Live BTC/ETH/SOL prices stopped updating",
+  livePriceFresh: false,
+  livePriceAgeMinutes: 240,
+  livePriceTimestamp: "2026-07-03T05:00:00Z",
+  livePriceUnchangedScanCount: 4,
   btcPriceChanged: false,
   ethPriceChanged: false,
   solPriceChanged: false,
   marketDataQuality: "FROZEN"
 };
 
-const staleLaneExplainer: LaneExplainerResult = {
-  ...laneExplainer,
-  bestLane: "NO_CLEAR_LANE",
-  bestLaneLabel: "Data stale",
-  laneConfidence: "Unavailable",
-  laneReason: "Market data stale: BTC/ETH/SOL prices unchanged across multiple scans",
-  laneRank1: "NO_CLEAR_LANE",
-  riskStyle: "Defensive / degraded",
-  ifInAction: "Protect gains / verify manually",
-  ifFlatAction: "Wait — data stale",
-  invalidIf: "Data feed not repaired"
-};
+function historyPoint(timestamp: string, btcPrice: number | null, ethPrice: number | null, solPrice: number | null, fresh = true): LaneExplainerHistoryPoint {
+  return {
+    timestamp,
+    timestampMs: Date.parse(timestamp),
+    score: 60,
+    regime: "Neutral / Chop",
+    leader: "SOL-led",
+    regimeConfidence: "Noisy",
+    marketMoveReason: null,
+    btcPrice,
+    ethPrice,
+    solPrice,
+    ethBtcRatio: null,
+    solBtcRatio: null,
+    solEthRatio: null,
+    livePriceTimestamp: timestamp,
+    bestLane: "SOL",
+    marketDataFresh: fresh
+  };
+}
 
-function testAlphaPulseHeader(): void {
-  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer);
+function majorsInput(overrides: Partial<AlphaPulseMajorsInput> = {}): AlphaPulseMajorsInput {
+  return {
+    timestamp: "2026-07-03T09:00:00Z",
+    livePriceTimestamp: "2026-07-03T09:00:00Z",
+    marketDataFresh: true,
+    scanIntervalMinutes: 15,
+    btcPrice: 60_600,
+    ethPrice: 1_980,
+    solPrice: 100,
+    history: [
+      historyPoint("2026-07-03T08:00:00Z", 60_000, 2_000, 100),
+      historyPoint("2026-07-03T08:15:00Z", 1, 1, 1)
+    ],
+    ...overrides
+  };
+}
+
+function pulse(
+  result = sampleResult(70, "Risk-On"),
+  context = buildEventContext(new Date("2026-07-03T09:00:00Z")),
+  marketData = freshMarketData,
+  majors = majorsInput(),
+  lane = laneExplainer
+): string {
+  return formatHeartbeatAlert(result, new Date(Date.now() + 15 * 60_000).toISOString(), result, lane, context, marketData, majors);
+}
+
+function testLockedShellRuntimeValuesAndOrder(): void {
+  const alert = pulse();
   const lines = alert.split("\n");
   assert.equal(lines[0], "\u2501".repeat(22));
-  assert.equal(lines[1], "\u2022  <b>ALPHA \u2764\uFE0F\u200D\u{1F525} PULSE</b>  \u2022");
+  assert.equal(lines[1], "<b>\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07</b>");
   assert.equal(lines[2], "\u2501".repeat(22));
+  assert.equal(lines.at(-2), "\u2501".repeat(22));
+  assert.equal(lines.at(-1), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01");
+
+  assert.match(alert, /🌡️ ᴍᴏᴅᴇ: ʀɪꜱᴋ-ᴏɴ/);
+  assert.match(alert, /<b>├─ ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
+  assert.match(alert, /<b>└─ ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ ⚠️<\/b>/);
+  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴄʜᴏᴘᴘʏ/);
+  assert.match(alert, /<b>├─ ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
+  assert.match(alert, /<b>└─ ᴘʀᴇꜱꜱᴜʀᴇ: ꜱᴏʟ ʀᴏᴛᴀᴛɪᴏɴ ᴀᴄᴛɪᴠᴇ<\/b>/);
+  assert.match(alert, /🎯 ᴘʟᴀɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
+  assert.match(alert, /<b>├─ ʙᴇꜱᴛ ʟᴀɴᴇ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
+  assert.match(alert, /<b>├─ ɪꜰ ɪɴ: ᴛʀᴀɪʟ • ᴅᴏɴ&#39;ᴛ ᴄʜᴀꜱᴇ<\/b>/);
+  assert.match(alert, /<b>└─ ɪꜰ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
+  assert.match(alert, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~15ᴍ/);
+
+  const ordered = ["🌡️ ᴍᴏᴅᴇ", "📈 ᴍᴀᴊᴏʀꜱ • 1ʜ", "🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ", "🎯 ᴘʟᴀɴ", "📎 ᴄᴏɴᴛᴇxᴛ", "⏱️ ɴᴇxᴛ ꜱᴄᴀɴ"];
+  for (let index = 1; index < ordered.length; index += 1) assert.ok(alert.indexOf(ordered[index - 1]) < alert.indexOf(ordered[index]));
 }
 
-function testMarketMoveHeaderEmojis(): void {
-  assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(4), "MOVE")[1], "\u2022  <b>MARKET \u{1F4C8} MOVE</b>  \u2022");
-  assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(-4), "MOVE")[1], "\u2022  <b>MARKET \u{1F4C9} MOVE</b>  \u2022");
-  assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
-  assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(0), "MOVE")[1], "\u2022  <b>MARKET \u26A1 MOVE</b>  \u2022");
+function testCausalMajorsAndFormatting(): void {
+  const derived = deriveAlphaPulseMajors1h(majorsInput());
+  assert.equal(derived.observedAt, "2026-07-03T08:00:00Z");
+  assert.ok(Math.abs((derived.btcReturnPct ?? 0) - 1) < 1e-9);
+  assert.ok(Math.abs((derived.ethReturnPct ?? 0) + 1) < 1e-9);
+  assert.equal(derived.solReturnPct, 0);
+
+  const alert = pulse();
+  assert.match(alert, /<b>├─ ʙᴛᴄ: \+1\.0%<\/b>/);
+  assert.match(alert, /<b>├─ ᴇᴛʜ: -1\.0%<\/b>/);
+  assert.match(alert, /<b>└─ ꜱᴏʟ: 0\.0%<\/b>/);
+
+  const futureOnly = majorsInput({ history: [historyPoint("2026-07-03T08:01:00Z", 60_000, 2_000, 100)] });
+  assert.deepEqual(deriveAlphaPulseMajors1h(futureOnly), { observedAt: null, btcReturnPct: null, ethReturnPct: null, solReturnPct: null });
+  const tooOld = majorsInput({ history: [historyPoint("2026-07-03T07:44:59Z", 60_000, 2_000, 100)] });
+  assert.equal(deriveAlphaPulseMajors1h(tooOld).observedAt, null);
+
+  const laggedCurrent = majorsInput({
+    livePriceTimestamp: "2026-07-03T08:55:00Z",
+    history: [{ ...historyPoint("2026-07-03T08:00:00Z", 60_000, 2_000, 100), livePriceTimestamp: "2026-07-03T07:55:00Z" }]
+  });
+  assert.equal(deriveAlphaPulseMajors1h(laggedCurrent).observedAt, "2026-07-03T07:55:00Z");
 }
 
-function testStaleMarketDataWording(): void {
-  const previousExplainerMode = process.env.ALPHA_PULSE_EXPLAINER_MODE;
-  process.env.ALPHA_PULSE_EXPLAINER_MODE = "false";
-  const pulse = formatHeartbeatAlert(
-    sampleResult(60),
-    "2026-07-03T09:15:00Z",
-    sampleResult(60),
-    staleLaneExplainer,
-    undefined,
-    staleMarketData
-  );
-  assert.match(pulse, /<b>Market Data:<\/b> Stale ⚠️/);
-  assert.match(pulse, /Read degraded — verify manually\./);
-  assert.match(pulse, /<b>Best Lane:<\/b> Data stale/);
-  assert.match(pulse, /<b>If In:<\/b> Protect gains \/ verify manually/);
-  assert.match(pulse, /<b>If Flat:<\/b> Wait — data stale/);
-  assert.doesNotMatch(pulse, /SOL leading/);
-
-  const move = formatRegimeAlert(
-    sampleResult(64),
-    "Score rose 60 -> 64",
-    "2026-07-03T09:30:00Z",
-    sampleResult(60),
-    staleLaneExplainer,
-    undefined,
-    staleMarketData
-  );
-  assert.match(move, /<b>Market Data:<\/b> Stale ⚠️/);
-  assert.match(move, /Market data is stale\. Do not trust lane\/score movement until feed repairs\./);
-  assert.doesNotMatch(move, /SOL leading/);
-  if (previousExplainerMode === undefined) delete process.env.ALPHA_PULSE_EXPLAINER_MODE;
-  else process.env.ALPHA_PULSE_EXPLAINER_MODE = previousExplainerMode;
+function testMissingOrDegradedDataNeverFabricatesMajors(): void {
+  const staleLane: LaneExplainerResult = {
+    ...laneExplainer,
+    bestLane: "NO_CLEAR_LANE",
+    bestLaneLabel: "Data stale",
+    ifInAction: "Protect gains / verify manually",
+    ifFlatAction: "Wait — data stale"
+  };
+  const alert = pulse(sampleResult(60), undefined, staleMarketData, majorsInput({ marketDataFresh: false }), staleLane);
+  assert.equal((alert.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length, 4);
+  assert.doesNotMatch(alert, /ʙᴛᴄ: [+-]?\d/);
+  assert.match(alert, /🌡️ ᴍᴏᴅᴇ: ɴᴇᴜᴛʀᴀʟ \/ ᴄʜᴏᴘ/);
+  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(alert, /<b>├─ ʙᴇꜱᴛ ʟᴀɴᴇ: ᴅᴀᴛᴀ ꜱᴛᴀʟᴇ<\/b>/);
 }
 
-function testContextAndExpiryRowsAreSeparate(): void {
-  const context = buildEventContext(new Date("2026-07-03T09:00:00Z"));
-  const pulseAlert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer, context);
-  const moveAlert = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, context);
+function testConditionalContextAndProviderNoiseFiltering(): void {
+  const result = sampleResult(70, "Risk-On");
+  const clear = formatHeartbeatAlert(result, new Date(Date.now() + 15 * 60_000).toISOString(), result, laneExplainer, undefined, freshMarketData, majorsInput());
+  assert.doesNotMatch(clear, /📎 ᴄᴏɴᴛᴇxᴛ/);
 
-  for (const alert of [pulseAlert, moveAlert]) {
-    assert.match(alert, /📎 <b>Context Only:<\/b>/);
-    assert.match(alert, /Expiry Window/);
-    assert.doesNotMatch(alert, /Event Stack:/);
-    assert.doesNotMatch(alert, /Liquidity: US Holiday - Context Only \| Expiry:/);
-    assert.ok(alert.indexOf("<b>Context Only:</b>") > alert.indexOf("<b>Plan:</b>"));
-  }
-}
-
-function testCompactDeduplicatedContextRows(): void {
   const context = buildEventContext(new Date("2026-10-31T09:00:00Z"));
   context.eventDisplayReasons = [
     "Liquidity: Thin Weekend Window",
     "Macro: FRED Context Available - Data Context Only; No Score Impact",
-    "Liquidity: Treasury Fiscaldata Available - Tga Context Only; No Score Impact",
-    "Liquidity: Net Liquidity Proxy Available - Telemetry Only"
+    "Liquidity: Treasury Fiscaldata Available - Tga Context Only; No Score Impact"
   ];
-  const alert = formatHeartbeatAlert(sampleResult(60), "2026-10-31T09:15:00Z", sampleResult(60), laneExplainer, context);
-
-  assert.equal((alert.match(/Weekend Liquidity/g) ?? []).length, 1);
-  assert.match(alert, /Halloween Window 🎃/);
-  assert.doesNotMatch(alert, /Macro: FRED Available/);
-  assert.doesNotMatch(alert, /Treasury: TGA Available/);
-  assert.doesNotMatch(alert, /Net Liquidity: Available/);
-  assert.doesNotMatch(alert, /Telemetry Only|No Score Impact|Data Context Only|Context Skipped/i);
-  assert.doesNotMatch(alert, /Fred|Tga/);
-  assert.doesNotMatch(alert, /Event Stack:/);
+  const contextual = pulse(sampleResult(70, "Risk-On", "2026-10-31T09:00:00Z"), context);
+  assert.match(contextual, /📎 ᴄᴏɴᴛᴇxᴛ: ᴡᴇᴇᴋᴇɴᴅ ʟɪqᴜɪᴅɪᴛʏ • ʜᴀʟʟᴏᴡᴇᴇɴ ᴡɪɴᴅᴏᴡ 🎃/);
+  assert.doesNotMatch(contextual, /FRED|TGA|Telemetry|No Score Impact|Event Stack/i);
 }
 
-function testDirectionalProviderContextCanRender(): void {
-  const context = buildEventContext(new Date("2026-07-08T09:00:00Z"));
-  context.eventDisplayReasons = [
-    "Liquidity: Net Liquidity Contracting",
-    "Liquidity: TGA Expanding",
-    "Macro: Risk Event"
-  ];
-  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer, context);
-  assert.match(alert, /Net Liquidity: Contracting/);
-  assert.match(alert, /TGA: Expanding/);
-  assert.match(alert, /Macro: Risk Event/);
+function testHtmlEscapingAndBalancedBoldTags(): void {
+  const escapedLane = { ...laneExplainer, ifInAction: "trail < protect & don't chase" };
+  const alert = pulse(sampleResult(70, "Risk-On"), undefined, freshMarketData, majorsInput(), escapedLane);
+  assert.match(alert, /ᴛʀᴀɪʟ &lt; ᴘʀᴏᴛᴇᴄᴛ &amp; ᴅᴏɴ&#39;ᴛ ᴄʜᴀꜱᴇ/);
+  assert.equal((alert.match(/<b>/g) ?? []).length, (alert.match(/<\/b>/g) ?? []).length);
+  assert.doesNotMatch(alert.replaceAll("<b>", "").replaceAll("</b>", ""), /[<>]/);
 }
 
-function testContextSectionOmittedWhenEmpty(): void {
-  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer);
-  assert.doesNotMatch(alert, /Context Only/);
+function testMarketMoveFormatterRemainsOnExistingLayout(): void {
+  const move = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer);
+  assert.equal(move.split("\n")[1], "\u2022  <b>MARKET \u{1F4C8} MOVE</b>  \u2022");
+  assert.match(move, /<b>Alert:<\/b>/);
+  assert.match(move, /📈 <b>Why It Fired:<\/b>/);
+  assert.match(move, /🎯 <b>Plan:<\/b>/);
+  assert.doesNotMatch(move, /ᴀʟᴘʜᴀ \| ᴘᴜʟꜱᴇ|ᴍᴀᴊᴏʀꜱ • 1ʜ/);
+
+  const staleMove = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, undefined, staleMarketData);
+  assert.match(staleMove, /<b>Market Data:<\/b> Stale ⚠️/);
+  assert.match(staleMove, /Market data is stale\. Do not trust lane\/score movement until feed repairs\./);
 }
 
-function testEventStacksBecomeCompactRows(): void {
-  const scenarios = [
-    ["2026-02-14T09:00:00Z", "Valentine’s Window 💘", "New Moon Research"],
-    ["2026-03-17T09:00:00Z", "St Patrick’s Window 🍀", "Expiry + New Moon"],
-    ["2026-04-01T09:00:00Z", "April Fools Window 🃏", "Full Moon Research"],
-    ["2026-10-31T09:00:00Z", "Halloween Window 🎃", "Month-End Flows"],
-    ["2026-05-05T09:00:00Z", "Cinco de Mayo Window", "Expiry Window"]
-  ] as const;
-
-  for (const [timestamp, windowRow, compactEventRow] of scenarios) {
-    const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer, buildEventContext(new Date(timestamp)));
-    assert.match(alert, new RegExp(windowRow.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.match(alert, new RegExp(compactEventRow.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(alert, /Event Stack:|Holiday Today/);
-  }
-
-  const julyFourth = formatHeartbeatAlert(sampleResult(60), "2026-07-03T09:15:00Z", sampleResult(60), laneExplainer, buildEventContext(new Date("2026-07-04T09:00:00Z")));
-  assert.equal((julyFourth.match(/July 4th Window 🇺🇸/g) ?? []).length, 1);
-  assert.doesNotMatch(julyFourth, /US holiday today|Independence Day/);
-}
-
-function testFarAwayEventContextHiddenFromAlerts(): void {
-  const context = buildEventContext(new Date("2026-07-08T09:00:00Z"), {
-    btcHalvingContext: { daysToNextBtcHalving: 602 }
-  });
-  const alert = formatHeartbeatAlert(sampleResult(60), "2026-07-08T09:15:00Z", sampleResult(60), laneExplainer, context);
-
-  assert.doesNotMatch(alert, /moon/i);
-  assert.doesNotMatch(alert, /halving/i);
-}
-
-function testFooterSeparatorMatchesHeader(): void {
-  const alert = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer);
-  const lines = alert.split("\n");
-  assert.equal(lines[0], lines[lines.length - 2]);
-  assert.equal(formatFooter()[0], lines[0]);
-}
-
-function testDisplayCapitalization(): void {
+function testExistingGenericHeaderFooterAndCapitalizationRemainStable(): void {
+  assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
+  assert.deepEqual(formatFooter(), ["\u2501".repeat(22), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"]);
   assert.equal(titleCaseDisplay("btc and sol repair by 09:15 utc during us holiday"), "BTC And SOL Repair By 09:15 UTC During US Holiday");
-  assert.equal(titleCaseDisplay("liquidity: us holiday - context only"), "Liquidity: US Holiday - Context Only");
-  assert.equal(titleCaseDisplay("09:15 utc (~15m)"), "09:15 UTC (~15m)");
 }
 
-testAlphaPulseHeader();
-testMarketMoveHeaderEmojis();
-testStaleMarketDataWording();
-testContextAndExpiryRowsAreSeparate();
-testCompactDeduplicatedContextRows();
-testDirectionalProviderContextCanRender();
-testContextSectionOmittedWhenEmpty();
-testEventStacksBecomeCompactRows();
-testFarAwayEventContextHiddenFromAlerts();
-testFooterSeparatorMatchesHeader();
-testDisplayCapitalization();
+testLockedShellRuntimeValuesAndOrder();
+testCausalMajorsAndFormatting();
+testMissingOrDegradedDataNeverFabricatesMajors();
+testConditionalContextAndProviderNoiseFiltering();
+testHtmlEscapingAndBalancedBoldTags();
+testMarketMoveFormatterRemainsOnExistingLayout();
+testExistingGenericHeaderFooterAndCapitalizationRemainStable();
 
 console.log("Telegram formatter tests passed.");

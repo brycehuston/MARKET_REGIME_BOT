@@ -194,7 +194,16 @@ export class MarketRegimeBot {
         }
       } else if (heartbeatWanted) {
         try {
-          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness));
+          await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness, {
+            timestamp: result.timestamp,
+            livePriceTimestamp: freshness.livePriceTimestamp,
+            marketDataFresh: freshness.marketDataFresh,
+            scanIntervalMinutes: this.config.scanIntervalMinutes,
+            btcPrice: accuracyFields.btcPrice,
+            ethPrice: accuracyFields.ethPrice,
+            solPrice: accuracyFields.solPrice,
+            history: laneHistory
+          }));
           heartbeatSent = true;
         } catch (error) {
           // Heartbeat delivery should not stop the bot from saving state/logs.

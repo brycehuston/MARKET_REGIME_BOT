@@ -1,9 +1,10 @@
 import { formatEventContextSummary } from "./eventContext";
-import { ActionGuidance, EventContext, LaneExplainerResult, LeaderName, MarketDataFreshnessFields, RegimeConfidence, RegimeScoreResult } from "./types";
+import { ActionGuidance, EventContext, LaneExplainerHistoryPoint, LaneExplainerResult, LeaderName, MarketDataFreshnessFields, RegimeConfidence, RegimeScoreResult } from "./types";
 
 const ALERT_SEPARATOR = "\u2501".repeat(22);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
 const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01";
+const ALPHA_PULSE_HEADER = "\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07";
 const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD", "FRED", "TGA", "NY"]);
 export interface TempoTapeContext {
   sessionPhase: string;
@@ -12,6 +13,24 @@ export interface TempoTapeContext {
   activityReason: string;
   tempo: string;
   tapeState: string;
+}
+
+export interface AlphaPulseMajorsInput {
+  timestamp: string;
+  livePriceTimestamp: string | null;
+  marketDataFresh: boolean;
+  scanIntervalMinutes: number;
+  btcPrice: number | null;
+  ethPrice: number | null;
+  solPrice: number | null;
+  history: LaneExplainerHistoryPoint[];
+}
+
+export interface AlphaPulseMajors1h {
+  observedAt: string | null;
+  btcReturnPct: number | null;
+  ethReturnPct: number | null;
+  solReturnPct: number | null;
 }
 
 export class TelegramClient {
@@ -132,54 +151,85 @@ export function formatHeartbeatAlert(
   previousResult?: RegimeScoreResult | null,
   laneExplainer?: LaneExplainerResult,
   eventContext?: EventContext,
-  marketData?: MarketDataFreshnessFields
+  marketData?: MarketDataFreshnessFields,
+  majorsInput?: AlphaPulseMajorsInput
 ): string {
   const dataStale = marketData?.marketDataFresh === false;
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
-  const nextScan = formatRelativeNextScan(nextScanIso);
-  const marketActivity = defiLine(result);
-  const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
+  const nextScan = formatAlphaPulseNextScan(nextScanIso);
+  const majors = deriveAlphaPulseMajors1h(majorsInput);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const contextRows = buildContextRows(eventContext, eventContextSummary);
+  const plan = dataStale ? "Protect / verify manually" : premiumHoldNowLabel(result, guidance);
+  const marketState = dataStale ? "Unavailable" : laneExplainer?.chopState ?? "Unavailable";
+  const pressure = dataStale ? "Unverified — verify manually" : tempoContext.tapeState;
   const lines = [
-    ...formatHeader("ALPHA", "\u2764\uFE0F\u200D\u{1F525}", "PULSE"),
+    ALERT_SEPARATOR,
+    `<b>${ALPHA_PULSE_HEADER}</b>`,
+    ALERT_SEPARATOR,
     "",
-    labeledLine("Mode", dataStale ? "Data stale" : premiumModeLabel(result, guidance)),
-    labeledLine("Confidence", dataStale ? "Degraded — stale data" : regimeConfidenceLabel(regimeConfidence)),
-    ...(dataStale
-      ? [labeledLine("Market Data", "Stale ⚠️"), "Read degraded — verify manually."]
-      : []),
+    pulseMainLine("\u{1F321}\uFE0F", "Mode", result.regime),
+    pulseTreeLine("\u251C\u2500", "Score", `${result.score}/100`),
+    pulseTreeLine("\u2514\u2500", "Confidence", regimeConfidenceLabel(regimeConfidence)),
     "",
-    treeHeaderLine("\u{1F3AF}", "Plan", dataStale ? "Protect / verify manually" : premiumHoldNowLabel(result, guidance)),
-    ...(useExplainer
-      ? [
-          treeLine("\u251C\u2500", "Best Lane", laneExplainer.bestLaneLabel),
-          treeLine("\u251C\u2500", "If In", laneExplainer.ifInAction),
-          ...formatTreeRows([["If Flat", laneExplainer.ifFlatAction]])
-        ]
-      : [
-          treeLine("\u251C\u2500", "Watch", premiumPulseWatchLine(result, guidance)),
-          ...formatTreeRows([["Avoid", premiumPulseAvoidLine(result, guidance)]])
-        ]),
+    pulseSectionLine("\u{1F4C8}", "Majors • 1H"),
+    pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajorReturn(majors.btcReturnPct)),
+    pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajorReturn(majors.ethReturnPct)),
+    pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajorReturn(majors.solReturnPct)),
     "",
-    ...formatContextSection(contextRows),
-    ...(dataStale
-      ? [
-          treeHeaderLine("\u{1F30A}", "Activity", "Data stale"),
-          treeLine("\u251C\u2500", "Session", formatSessionLine(tempoContext)),
-          treeLine("\u2514\u2500", "Pressure", "Unverified — verify manually")
-        ]
-      : buildPulseActivitySection(marketActivity, tempoContext, result, guidance, useExplainer ? laneExplainer : undefined)),
+    pulseMainLine("\u{1F30A}", "Market State", marketState),
+    pulseTreeLine("\u251C\u2500", "Session", tempoContext.sessionPhase),
+    pulseTreeLine("\u2514\u2500", "Pressure", pressure),
     "",
-    treeHeaderLine("\u{1F4CA}", "Score", dataStale ? `${result.score}/100 — stale input` : `${result.score}/100`),
-    treeLine("\u2514\u2500", "Next Scan", nextScan),
+    pulseMainLine("\u{1F3AF}", "Plan", plan),
+    pulseTreeLine("\u251C\u2500", "Best Lane", laneExplainer?.bestLaneLabel ?? "Unavailable"),
+    pulseTreeLine("\u251C\u2500", "If In", (laneExplainer?.ifInAction ?? "Unavailable").replace(/,\s+/g, " • ")),
+    pulseTreeLine("\u2514\u2500", "If Flat", (laneExplainer?.ifFlatAction ?? "Unavailable").replace(/,\s+/g, " • ")),
     "",
-    ...formatFooter()
+    ...(contextRows.length > 0 ? [pulseMainLine("\u{1F4CE}", "Context", contextRows.join(" • ")), ""] : []),
+    pulseMainLine("\u23F1\uFE0F", "Next Scan", nextScan),
+    "",
+    ALERT_SEPARATOR,
+    FOOTER
   ];
 
   return lines.join("\n");
+}
+
+export function deriveAlphaPulseMajors1h(input?: AlphaPulseMajorsInput): AlphaPulseMajors1h {
+  const unavailable: AlphaPulseMajors1h = { observedAt: null, btcReturnPct: null, ethReturnPct: null, solReturnPct: null };
+  if (!input || input.marketDataFresh !== true) return unavailable;
+
+  const currentMs = new Date(input.timestamp).getTime();
+  const livePriceMs = input.livePriceTimestamp ? new Date(input.livePriceTimestamp).getTime() : NaN;
+  const scanIntervalMs = input.scanIntervalMinutes * 60_000;
+  if (!Number.isFinite(currentMs) || !Number.isFinite(livePriceMs) || livePriceMs > currentMs || !Number.isFinite(scanIntervalMs) || scanIntervalMs <= 0) return unavailable;
+
+  const targetMs = livePriceMs - 60 * 60_000;
+  const prior = input.history
+    .filter((point) => point.marketDataFresh === true && point.timestampMs <= currentMs)
+    .map((point) => {
+      const pointLiveMs = point.livePriceTimestamp ? new Date(point.livePriceTimestamp).getTime() : NaN;
+      return { point, pointLiveMs };
+    })
+    .filter(({ pointLiveMs }) => Number.isFinite(pointLiveMs) && pointLiveMs <= targetMs && pointLiveMs >= targetMs - scanIntervalMs)
+    .sort((left, right) => right.pointLiveMs - left.pointLiveMs || right.point.timestampMs - left.point.timestampMs)[0]?.point;
+  if (!prior) return unavailable;
+
+  return {
+    observedAt: prior.livePriceTimestamp ?? prior.timestamp,
+    btcReturnPct: percentageReturn(input.btcPrice, prior.btcPrice),
+    ethReturnPct: percentageReturn(input.ethPrice, prior.ethPrice),
+    solReturnPct: percentageReturn(input.solPrice, prior.solPrice)
+  };
+}
+
+export function formatAlphaPulseMajorReturn(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "Unavailable";
+  const rounded = Math.abs(value) < 0.05 ? 0 : Number(value.toFixed(1));
+  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`;
 }
 
 export function formatHeader(leftTitle: string, emoji: string, rightTitle?: string): string[] {
@@ -582,6 +632,33 @@ function treeHeaderLine(icon: string, label: string, value: string): string {
 
 function treeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, value: string): string {
   return `${branch} <b>${escapeHtml(label)}:</b> ${escapeHtml(titleCaseDisplay(value))}`;
+}
+
+function pulseMainLine(icon: string, label: string, value: string): string {
+  return `<b>${icon} ${escapeHtml(smallCapsDisplay(label))}: ${escapeHtml(smallCapsDisplay(value))}</b>`;
+}
+
+function pulseSectionLine(icon: string, label: string): string {
+  return `<b>${icon} ${escapeHtml(smallCapsDisplay(label))}</b>`;
+}
+
+function pulseTreeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, value: string): string {
+  return `<b>${branch} ${escapeHtml(smallCapsDisplay(label))}: ${escapeHtml(smallCapsDisplay(value))}</b>`;
+}
+
+function smallCapsDisplay(value: string): string {
+  const map: Record<string, string> = {
+    a: "\u1D00", b: "\u0299", c: "\u1D04", d: "\u1D05", e: "\u1D07", f: "\uA730", g: "\u0262",
+    h: "\u029C", i: "\u026A", j: "\u1D0A", k: "\u1D0B", l: "\u029F", m: "\u1D0D", n: "\u0274",
+    o: "\u1D0F", p: "\u1D18", q: "q", r: "\u0280", s: "\uA731", t: "\u1D1B", u: "\u1D1C", v: "\u1D20",
+    w: "\u1D21", x: "x", y: "\u028F", z: "\u1D22"
+  };
+  return [...value.toLowerCase()].map((character) => map[character] ?? character).join("");
+}
+
+function percentageReturn(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous) || current <= 0 || previous <= 0) return null;
+  return ((current / previous) - 1) * 100;
 }
 
 function buildPulseActivitySection(
@@ -1282,6 +1359,12 @@ function formatRelativeNextScan(nextScanIso: string | undefined): string {
   const hour = String(date.getUTCHours()).padStart(2, "0");
   const minute = String(date.getUTCMinutes()).padStart(2, "0");
   return `${hour}:${minute} UTC (~${minutes}m)`;
+}
+
+function formatAlphaPulseNextScan(nextScanIso: string | undefined): string {
+  const formatted = formatRelativeNextScan(nextScanIso);
+  const match = formatted.match(/^(\d{2}:\d{2}) UTC \(~(\d+)m\)$/);
+  return match ? `${match[1]} UTC • ~${match[2]}m` : formatted;
 }
 
 function escapeHtml(value: string | number | null | undefined): string {
