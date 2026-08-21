@@ -263,19 +263,323 @@ function testHtmlEscapingAndBalancedBoldTags(): void {
   assert.doesNotMatch(alert.replaceAll("<b>", "").replaceAll("</b>", ""), /[<>]/);
 }
 
-function testMarketMoveFormatterRemainsOnExistingLayout(): void {
-  const move = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer);
-  assert.equal(move.split("\n")[1], "\u2022  <b>MARKET \u{1F4C8} MOVE</b>  \u2022");
-  assert.match(move, /<b>Alert:<\/b>/);
-  assert.match(move, /📈 <b>Why It Fired:<\/b>/);
-  assert.match(move, /🎯 <b>Plan:<\/b>/);
-  assert.doesNotMatch(move, /ᴀʟᴘʜᴀ \| ᴘᴜʟꜱᴇ|ᴍᴀᴊᴏʀꜱ • 1ʜ/);
-
-  const staleMove = formatRegimeAlert(sampleResult(64), "Score rose 60 -> 64", "2026-07-03T09:30:00Z", sampleResult(60), laneExplainer, undefined, staleMarketData);
-  assert.match(staleMove, /<b>Market Data:<\/b> Stale ⚠️/);
-  assert.match(staleMove, /Market data is stale\. Do not trust lane\/score movement until feed repairs\./);
+function marketMoveMajors(
+  overrides: Partial<AlphaPulseMajorsInput> = {}
+): AlphaPulseMajorsInput {
+  return majorsInput({
+    history: [
+      historyPoint("2026-07-03T08:45:00Z", 60_420, 1_970, 98.9)
+    ],
+    ...overrides
+  });
 }
 
+function withLeader(
+  result: RegimeScoreResult,
+  leader: RegimeScoreResult["leader"]
+): RegimeScoreResult {
+  return { ...result, leader };
+}
+
+function withComponentScore(
+  result: RegimeScoreResult,
+  name: string,
+  score: number
+): RegimeScoreResult {
+  return {
+    ...result,
+    components: result.components.map((component) =>
+      component.name === name ? { ...component, score } : component
+    )
+  };
+}
+
+function testMarketMoveRegimeChangeLockedLayout(): void {
+  const previous = sampleResult(
+    58,
+    "Neutral / Chop",
+    "2026-07-03T08:45:00Z"
+  );
+
+  const current = sampleResult(
+    61,
+    "Risk-On",
+    "2026-07-03T09:00:00Z"
+  );
+
+  const move = formatRegimeAlert(
+    current,
+    "Regime changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors()
+  );
+
+  assert.equal(
+    move.split("\n")[1],
+    "<b>📈 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
+  );
+
+  assert.match(move, /<b>🔄 ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.doesNotMatch(move, /Major Shift|ᴍᴀᴊᴏʀ ꜱʜɪꜰᴛ/);
+
+  assert.match(move, /ꜱᴄᴏʀᴇ: 58 → 61/);
+  assert.match(
+    move,
+    /ᴍᴏᴅᴇ: ɴᴇᴜᴛʀᴀʟ \/ ᴄʜᴏᴘ → ʀɪꜱᴋ-ᴏɴ/
+  );
+
+  assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
+
+  assert.match(move, /🌐 ᴍᴀᴊᴏʀꜱ • ꜱɪɴᴄᴇ ʟᴀꜱᴛ ꜱᴄᴀɴ/);
+  assert.match(move, /ʙᴛᴄ: \+0\.3%/);
+  assert.match(move, /ᴇᴛʜ: \+0\.5%/);
+  assert.match(move, /ꜱᴏʟ: \+1\.1%/);
+
+  assert.match(move, /🎯 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
+
+  assert.match(move, /🌊 ᴄᴏɴᴛᴇxᴛ: ᴄʜᴏᴘᴘʏ • ᴍɪᴅ ʟᴏɴᴅᴏɴ/);
+  assert.match(move, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~15ᴍ/);
+
+  assert.equal(
+    move.split("\n").at(-1),
+    "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"
+  );
+
+  assert.equal(
+    (move.match(/<b>/g) ?? []).length,
+    (move.match(/<\/b>/g) ?? []).length
+  );
+}
+
+function testMarketMoveScoreSlipOmitsUnchangedState(): void {
+  const previous = sampleResult(
+    70,
+    "Risk-On",
+    "2026-07-03T08:45:00Z"
+  );
+
+  const current = sampleResult(
+    64,
+    "Risk-On",
+    "2026-07-03T09:00:00Z"
+  );
+
+  const move = formatRegimeAlert(
+    current,
+    "Score dropped",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors()
+  );
+
+  assert.equal(
+    move.split("\n")[1],
+    "<b>📉 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
+  );
+
+  assert.match(move, /📉 ꜱᴄᴏʀᴇ ꜱʟɪᴘ/);
+  assert.match(move, /ꜱᴄᴏʀᴇ: 70 → 64/);
+
+  assert.doesNotMatch(move, /[├└]─ ᴍᴏᴅᴇ:/);
+  assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
+  assert.doesNotMatch(move, /[├└]─ ʟᴇᴀᴅᴇʀ:/);
+
+  assert.equal(
+    (move.match(/ᴄᴏɴꜰɪᴅᴇɴᴄᴇ:/g) ?? []).length,
+    1
+  );
+
+  assert.doesNotMatch(move, /🎯 ᴀᴄᴛɪᴏɴ:/);
+}
+
+function testMarketMoveLeadershipOnlyChange(): void {
+  const previous = withLeader(
+    sampleResult(64, "Risk-On", "2026-07-03T08:45:00Z"),
+    "BTC-led"
+  );
+
+  const current = withLeader(
+    sampleResult(64, "Risk-On", "2026-07-03T09:00:00Z"),
+    "SOL-led"
+  );
+
+  const move = formatRegimeAlert(
+    current,
+    "Leader changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors()
+  );
+
+  assert.equal(
+    move.split("\n")[1],
+    "<b>🔄 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
+  );
+
+  assert.match(move, /⚡ ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ/);
+  assert.match(move, /ʟᴇᴀᴅᴇʀ: ʙᴛᴄ-ʟᴇᴅ → ꜱᴏʟ-ʟᴇᴅ/);
+  assert.doesNotMatch(move, /[├└]─ ꜱᴄᴏʀᴇ:/);
+  assert.match(move, /🎯 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
+}
+
+function testMarketMoveConfidenceOnlyChange(): void {
+  const previous = sampleResult(
+    58,
+    "Neutral / Chop",
+    "2026-07-03T08:45:00Z"
+  );
+
+  const current = withComponentScore(
+    sampleResult(58, "Neutral / Chop", "2026-07-03T09:00:00Z"),
+    "BTC trend / structure",
+    10
+  );
+
+  const move = formatRegimeAlert(
+    current,
+    "Confidence changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors()
+  );
+
+  assert.match(move, /⚡ ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ/);
+  assert.match(
+    move,
+    /ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ᴄᴏɴꜰɪʀᴍᴇᴅ ✅ → ɴᴏɪꜱʏ ⚠️/
+  );
+
+  assert.doesNotMatch(move, /[├└]─ ꜱᴄᴏʀᴇ:/);
+  assert.doesNotMatch(move, /[├└]─ ᴍᴏᴅᴇ:/);
+  assert.doesNotMatch(move, /[├└]─ ʟᴇᴀᴅᴇʀ:/);
+  assert.doesNotMatch(move, /🎯 ᴀᴄᴛɪᴏɴ:/);
+}
+
+function testMarketMoveMajorsAreCausalOrUnavailable(): void {
+  const previous = sampleResult(
+    58,
+    "Neutral / Chop",
+    "2026-07-03T08:45:00Z"
+  );
+
+  const current = sampleResult(
+    61,
+    "Risk-On",
+    "2026-07-03T09:00:00Z"
+  );
+
+  const causal = formatRegimeAlert(
+    current,
+    "Regime changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors({
+      history: [
+        historyPoint("2026-07-03T09:01:00Z", 1, 1, 1),
+        historyPoint("2026-07-03T08:45:00Z", 60_420, 1_970, 98.9)
+      ]
+    })
+  );
+
+  assert.match(causal, /ʙᴛᴄ: \+0\.3%/);
+  assert.match(causal, /ᴇᴛʜ: \+0\.5%/);
+  assert.match(causal, /ꜱᴏʟ: \+1\.1%/);
+
+  const unavailable = formatRegimeAlert(
+    current,
+    "Regime changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors({ history: [] })
+  );
+
+  assert.equal(
+    (unavailable.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length,
+    3
+  );
+
+  const tooOld = formatRegimeAlert(
+    current,
+    "Regime changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors({
+      history: [
+        historyPoint("2026-07-03T08:20:00Z", 60_420, 1_970, 98.9)
+      ]
+    })
+  );
+
+  assert.equal(
+    (tooOld.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length,
+    3
+  );
+}
+
+function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
+  const previous = sampleResult(
+    60,
+    "Neutral / Chop",
+    "2026-10-31T08:45:00Z"
+  );
+
+  const current = sampleResult(
+    64,
+    "Risk-On",
+    "2026-10-31T09:00:00Z"
+  );
+
+  const stale = formatRegimeAlert(
+    current,
+    "Score rose",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    previous,
+    laneExplainer,
+    buildEventContext(new Date("2026-10-31T09:00:00Z")),
+    staleMarketData,
+    marketMoveMajors({
+      timestamp: "2026-10-31T09:00:00Z",
+      livePriceTimestamp: "2026-10-31T05:00:00Z",
+      marketDataFresh: false,
+      history: []
+    })
+  );
+
+  assert.match(stale, /⚠️ ᴍᴏᴠᴇ ᴜɴᴠᴇʀɪꜰɪᴇᴅ/);
+  assert.equal(
+    (stale.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length >= 3,
+    true
+  );
+
+  assert.match(
+    stale,
+    /🎯 ᴀᴄᴛɪᴏɴ: ᴘʀᴏᴛᴇᴄᴛ \/ ᴠᴇʀɪꜰʏ ᴍᴀɴᴜᴀʟʟʏ/
+  );
+
+  assert.match(stale, /ᴇᴠᴇɴᴛ:/);
+}
 function testExistingGenericHeaderFooterAndCapitalizationRemainStable(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
   assert.deepEqual(formatFooter(), ["\u2501".repeat(22), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"]);
@@ -287,7 +591,12 @@ testCausalMajorsAndFormatting();
 testMissingOrDegradedDataNeverFabricatesMajors();
 testConditionalContextAndProviderNoiseFiltering();
 testHtmlEscapingAndBalancedBoldTags();
-testMarketMoveFormatterRemainsOnExistingLayout();
+testMarketMoveRegimeChangeLockedLayout();
+testMarketMoveScoreSlipOmitsUnchangedState();
+testMarketMoveLeadershipOnlyChange();
+testMarketMoveConfidenceOnlyChange();
+testMarketMoveMajorsAreCausalOrUnavailable();
+testMarketMoveStaleSafetyAndConditionalEventContext();
 testExistingGenericHeaderFooterAndCapitalizationRemainStable();
 
 console.log("Telegram formatter tests passed.");

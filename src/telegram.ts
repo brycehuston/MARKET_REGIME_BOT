@@ -77,74 +77,88 @@ export function formatRegimeAlert(
   previousResult?: RegimeScoreResult | null,
   laneExplainer?: LaneExplainerResult,
   eventContext?: EventContext,
-  marketData?: MarketDataFreshnessFields
+  marketData?: MarketDataFreshnessFields,
+  majorsInput?: AlphaPulseMajorsInput
 ): string {
   const dataStale = marketData?.marketDataFresh === false;
   const guidance = getActionGuidance(result);
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
-  const nextScan = formatRelativeNextScan(nextScanIso);
-  const marketActivity = defiLine(result);
-  const whyLines: Array<[string, string]> = dataStale
-    ? [["Data", "Market data stale"], ["Action", "Verify BTC/ETH/SOL prices manually"]]
-    : buildMoveWhyLines(result, previousResult, alertReason);
-  const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
+  const previousConfidence = previousResult ? deriveRegimeConfidence(previousResult, null) : null;
+  const nextScan = formatAlphaPulseNextScan(nextScanIso);
+  const majors = deriveMarketMoveMajorsSinceLastScan(majorsInput);
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const contextRows = buildContextRows(eventContext, eventContextSummary);
-  const riskBackLines = dataStale
-    ? ["Data feed repairs and prices are verified."]
-    : useExplainer ? buildExplainerRiskBackLines(laneExplainer) : buildMoveFlipLines(result, guidance);
-  const scoreDelta = previousResult ? result.score - previousResult.score : null;
-  const marketMoveEmoji = selectMarketMoveHeaderEmoji(scoreDelta, isCriticalMarketMove(result, previousResult));
-  const whyIcon = scoreDelta !== null && scoreDelta > 0 ? "\u{1F4C8}" : scoreDelta !== null && scoreDelta < 0 ? "\u{1F4C9}" : "\u26A1";
+  const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
+
+  const directionIcon = dataStale ? "\u{1F504}" : marketMoveDirectionIcon(result, previousResult);
+  const changeIcon = directionIcon === "\u{1F504}" ? "\u26A1" : directionIcon;
+  const event = dataStale
+    ? { icon: "\u26A0\uFE0F", label: "Move Unverified" }
+    : marketMoveEventPresentation(result, previousResult, regimeConfidence, previousConfidence);
+
+  const changedRows: Array<[string, string]> = dataStale
+    ? [["Data", "Market data stale"]]
+    : buildMarketMoveChangedRows(result, previousResult, regimeConfidence, previousConfidence, alertReason);
+
+  const currentAction = dataStale
+    ? "Protect / verify manually"
+    : buildMoveActionLabel(result, guidance);
+
+  const previousAction = previousResult
+    ? buildMoveActionLabel(previousResult, getActionGuidance(previousResult))
+    : null;
+
+  const showAction = dataStale || !previousResult || currentAction !== previousAction;
+
+  const readLines = dataStale
+    ? ["Market data is stale.", "Verify BTC/ETH/SOL before acting."]
+    : useExplainer
+      ? buildExplainerMoveReadLines(result, laneExplainer).slice(0, 2)
+      : buildMoveReadLines(result, guidance).slice(0, 2);
+
+  const marketContext = [
+    dataStale ? "Unavailable" : laneExplainer?.chopState ?? "Unavailable",
+    tempoContext.sessionPhase
+  ].join(" \u2022 ");
+
   const lines = [
-    ...formatHeader("MARKET", marketMoveEmoji, "MOVE"),
+    ALERT_SEPARATOR,
+    pulseSectionLine(directionIcon, "Alpha | Market Move"),
+    ALERT_SEPARATOR,
     "",
-    labeledLine("Alert", dataStale ? "Data stale — move unverified" : buildMoveAlertLabel(result, previousResult)),
-    labeledLine("Confidence", dataStale ? "Degraded — stale data" : regimeConfidenceLabel(regimeConfidence)),
-    ...(dataStale
-      ? [labeledLine("Market Data", "Stale ⚠️"), "Read degraded — verify manually."]
+    pulseSectionLine(event.icon, event.label),
+    pulseTreeLine(
+      "\u2514\u2500",
+      "Confidence",
+      dataStale ? "Degraded \u2014 stale data" : regimeConfidenceLabel(regimeConfidence)
+    ),
+    "",
+    pulseSectionLine(changeIcon, "What Changed"),
+    ...formatPulseTreeRows(changedRows),
+    "",
+    pulseSectionLine("\u{1F310}", "Majors \u2022 Since Last Scan"),
+    pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajorReturn(majors.btcReturnPct)),
+    pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajorReturn(majors.ethReturnPct)),
+    pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajorReturn(majors.solReturnPct)),
+    ...(showAction ? ["", pulseMainLine("\u{1F3AF}", "Action", currentAction)] : []),
+    "",
+    pulseTextLine("\u{1F4A1}", readLines[0] ?? "Market state changed."),
+    ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
+    "",
+    pulseMainLine("\u{1F30A}", "Context", marketContext),
+    ...(contextRows.length > 0
+      ? [pulseTreeLine("\u2514\u2500", "Event", contextRows.join(" \u2022 "))]
       : []),
     "",
-    sectionLine(whyIcon, "Why It Fired"),
-    ...formatTreeRows(whyLines),
+    pulseMainLine("\u23F1\uFE0F", "Next Scan", nextScan),
     "",
-    treeHeaderLine("\u{1F3AF}", "Plan", dataStale ? "Protect / verify manually" : buildMoveActionLabel(result, guidance)),
-    ...(useExplainer
-      ? formatTreeRows([
-          ["Best Lane", laneExplainer.bestLaneLabel],
-          ["If In", laneExplainer.ifInAction],
-          ["If Flat", laneExplainer.ifFlatAction]
-        ])
-      : formatTreeRows([
-          ["Watch", buildMoveWatchLabel(result, guidance)],
-          ["Avoid", buildMoveAvoidLabel(result, guidance)]
-        ])),
-    "",
-    ...formatContextSection(contextRows),
-    sectionLine("\u{1F9E0}", "Read"),
-    ...formatTreeRows((dataStale
-      ? ["Market data is stale. Do not trust lane/score movement until feed repairs."]
-      : useExplainer
-        ? buildExplainerMoveReadLines(result, laneExplainer)
-        : buildMoveReadLines(result, guidance)).map((line) => [null, line])),
-    "",
-    treeHeaderLine("\u{1F30A}", "Market", dataStale ? "Data stale" : marketActivity ?? sentenceCase(tempoContext.activityState)),
-    ...formatTreeRows([
-      ["Session", formatSessionLine(tempoContext)],
-      ["Pressure", dataStale ? "Unverified — verify manually" : buildMovePressureLabel(result, guidance, tempoContext)],
-      ["Next Scan", nextScan]
-    ]),
-    "",
-    sectionLine("\u2705", "Risk Back If"),
-    ...formatTreeRows(riskBackLines.map((line) => [null, line])),
-    "",
-    ...formatFooter()
+    ALERT_SEPARATOR,
+    FOOTER
   ];
 
   return lines.join("\n");
 }
-
 export function formatHeartbeatAlert(
   result: RegimeScoreResult,
   nextScanIso: string,
@@ -232,6 +246,197 @@ export function formatAlphaPulseMajorReturn(value: number | null): string {
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`;
 }
 
+export function deriveMarketMoveMajorsSinceLastScan(input?: AlphaPulseMajorsInput): AlphaPulseMajors1h {
+  const unavailable: AlphaPulseMajors1h = {
+    observedAt: null,
+    btcReturnPct: null,
+    ethReturnPct: null,
+    solReturnPct: null
+  };
+
+  if (!input || input.marketDataFresh !== true) return unavailable;
+
+  const currentMs = new Date(input.timestamp).getTime();
+  const livePriceMs = input.livePriceTimestamp
+    ? new Date(input.livePriceTimestamp).getTime()
+    : NaN;
+  const scanIntervalMs = input.scanIntervalMinutes * 60_000;
+  const maxPriorScanGapMs = scanIntervalMs + 2 * 60_000;
+
+  if (
+    !Number.isFinite(currentMs) ||
+    !Number.isFinite(livePriceMs) ||
+    livePriceMs > currentMs ||
+    !Number.isFinite(scanIntervalMs) ||
+    scanIntervalMs <= 0
+  ) {
+    return unavailable;
+  }
+
+  const prior = input.history
+    .filter(
+      (point) =>
+        point.marketDataFresh === true &&
+        point.timestampMs < currentMs &&
+        currentMs - point.timestampMs <= maxPriorScanGapMs
+    )
+    .map((point) => {
+      const pointLiveMs = point.livePriceTimestamp
+        ? new Date(point.livePriceTimestamp).getTime()
+        : NaN;
+
+      return { point, pointLiveMs };
+    })
+    .filter(
+      ({ pointLiveMs }) =>
+        Number.isFinite(pointLiveMs) &&
+        pointLiveMs < livePriceMs &&
+        livePriceMs - pointLiveMs <= maxPriorScanGapMs
+    )
+    .sort(
+      (left, right) =>
+        right.pointLiveMs - left.pointLiveMs ||
+        right.point.timestampMs - left.point.timestampMs
+    )[0]?.point;
+
+  if (!prior) return unavailable;
+
+  return {
+    observedAt: prior.livePriceTimestamp ?? prior.timestamp,
+    btcReturnPct: percentageReturn(input.btcPrice, prior.btcPrice),
+    ethReturnPct: percentageReturn(input.ethPrice, prior.ethPrice),
+    solReturnPct: percentageReturn(input.solPrice, prior.solPrice)
+  };
+}
+
+function marketMoveDirectionIcon(
+  result: RegimeScoreResult,
+  previousResult?: RegimeScoreResult | null
+): string {
+  if (!previousResult) return "\u{1F504}";
+
+  const regimeDelta =
+    regimeRank(result.regime) - regimeRank(previousResult.regime);
+
+  if (regimeDelta > 0) return "\u{1F4C8}";
+  if (regimeDelta < 0) return "\u{1F4C9}";
+
+  const scoreDelta = result.score - previousResult.score;
+
+  if (scoreDelta > 0) return "\u{1F4C8}";
+  if (scoreDelta < 0) return "\u{1F4C9}";
+
+  return "\u{1F504}";
+}
+
+function marketMoveEventPresentation(
+  result: RegimeScoreResult,
+  previousResult: RegimeScoreResult | null | undefined,
+  currentConfidence: RegimeConfidence,
+  previousConfidence: RegimeConfidence | null
+): { icon: string; label: string } {
+  if (!previousResult) {
+    return { icon: "\u26A1", label: "New Signal" };
+  }
+
+  if (result.regime !== previousResult.regime) {
+    return { icon: "\u{1F504}", label: "Regime Change" };
+  }
+
+  const scoreDelta = result.score - previousResult.score;
+
+  if (scoreDelta > 0) {
+    return { icon: "\u{1F4C8}", label: "Score Recovery" };
+  }
+
+  if (scoreDelta < 0) {
+    return { icon: "\u{1F4C9}", label: "Score Slip" };
+  }
+
+  if (result.leader !== previousResult.leader) {
+    return { icon: "\u26A1", label: "Leadership Change" };
+  }
+
+  if (previousConfidence !== null && currentConfidence !== previousConfidence) {
+    return { icon: "\u26A1", label: "Confidence Change" };
+  }
+
+  return { icon: "\u26A1", label: "Market Update" };
+}
+
+function buildMarketMoveChangedRows(
+  result: RegimeScoreResult,
+  previousResult: RegimeScoreResult | null | undefined,
+  currentConfidence: RegimeConfidence,
+  previousConfidence: RegimeConfidence | null,
+  alertReason: string
+): Array<[string, string]> {
+  if (!previousResult) {
+    return [
+      ["Score", `${result.score}/100`],
+      ["Mode", result.regime],
+      ["Risk", buildRiskLevelLabel(result)],
+      ["Confidence", regimeConfidenceLabel(currentConfidence)],
+      ["Leader", result.leader]
+    ];
+  }
+
+  const rows: Array<[string, string]> = [];
+
+  if (result.score !== previousResult.score) {
+    rows.push(["Score", `${previousResult.score} \u2192 ${result.score}`]);
+  }
+
+  if (result.regime !== previousResult.regime) {
+    rows.push(["Mode", `${previousResult.regime} \u2192 ${result.regime}`]);
+  }
+
+  const previousRisk = buildRiskLevelLabel(previousResult);
+  const currentRisk = buildRiskLevelLabel(result);
+
+  if (previousRisk !== currentRisk) {
+    rows.push(["Risk", `${previousRisk} \u2192 ${currentRisk}`]);
+  }
+
+  if (previousConfidence !== null && previousConfidence !== currentConfidence) {
+    rows.push([
+      "Confidence",
+      `${regimeConfidenceLabel(previousConfidence)} \u2192 ${regimeConfidenceLabel(currentConfidence)}`
+    ]);
+  }
+
+  if (result.leader !== previousResult.leader) {
+    rows.push(["Leader", `${previousResult.leader} \u2192 ${result.leader}`]);
+  }
+
+  if (rows.length === 0) {
+    const fallback = parseReasonLines(alertReason)[0] ?? "Material market update";
+    rows.push(["Update", fallback]);
+  }
+
+  return rows;
+}
+
+function formatPulseTreeRows(rows: Array<[string, string]>): string[] {
+  return rows.map(([label, value], index) =>
+    pulseTreeLine(
+      index === rows.length - 1 ? "\u2514\u2500" : "\u251C\u2500",
+      label,
+      value
+    )
+  );
+}
+
+function pulseTextLine(icon: string, value: string): string {
+  return `<b>${icon} ${escapeHtml(smallCapsDisplay(value))}</b>`;
+}
+
+function pulseTreeTextLine(
+  branch: "\u251C\u2500" | "\u2514\u2500",
+  value: string
+): string {
+  return `<b>${branch} ${escapeHtml(smallCapsDisplay(value))}</b>`;
+}
 export function formatHeader(leftTitle: string, emoji: string, rightTitle?: string): string[] {
   const title = rightTitle ? `${leftTitle} ${emoji} ${rightTitle}` : `${leftTitle} ${emoji}`;
   return [ALERT_SEPARATOR, `\u2022  <b>${escapeHtml(title)}</b>  \u2022`, ALERT_SEPARATOR];

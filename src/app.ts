@@ -182,7 +182,16 @@ export class MarketRegimeBot {
           console.log("Telegram alert wanted, but TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.");
         } else {
           try {
-            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness));
+            await this.telegram.sendMessage(formatRegimeAlert(result, decision.reason, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness, {
+            timestamp: result.timestamp,
+            livePriceTimestamp: freshness.livePriceTimestamp,
+            marketDataFresh: freshness.marketDataFresh,
+            scanIntervalMinutes: this.config.scanIntervalMinutes,
+            btcPrice: accuracyFields.btcPrice,
+            ethPrice: accuracyFields.ethPrice,
+            solPrice: accuracyFields.solPrice,
+            history: laneHistory
+          }));
             telegramSent = true;
           } catch (error) {
             // Alert delivery should not stop the bot from saving state/logs.
