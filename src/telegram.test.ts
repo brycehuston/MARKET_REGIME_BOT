@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { buildEventContext } from "./eventContext";
 import {
+  buildTempoTapeContext,
   deriveAlphaPulseMajors1h,
   formatFooter,
   formatHeader,
@@ -10,7 +11,7 @@ import {
   titleCaseDisplay,
   type AlphaPulseMajorsInput
 } from "./telegram";
-import { LaneExplainerHistoryPoint, LaneExplainerResult, MarketDataFreshnessFields, RegimeName, RegimeScoreResult } from "./types";
+import { DerivativesHeatAssetSnapshot, DerivativesHeatSnapshot, LaneExplainerHistoryPoint, LaneExplainerResult, MarketDataFreshnessFields, RegimeName, RegimeScoreResult } from "./types";
 
 function sampleResult(score: number, regime: RegimeName = "Neutral / Chop", timestamp = "2026-07-03T09:00:00Z"): RegimeScoreResult {
   return {
@@ -605,3 +606,148 @@ testMarketMoveStaleSafetyAndConditionalEventContext();
 testExistingGenericHeaderFooterAndCapitalizationRemainStable();
 
 console.log("Telegram formatter tests passed.");
+
+// ============================================================
+// DERIVATIVES RESEARCH ISOLATION TESTS
+// Proves that enabling derivatives collection (DERIVATIVES_HEAT_ENABLED=true)
+// has zero effect on Telegram output, activityState, activityReason, or tempo.
+// ============================================================
+
+function makeActiveHeatSnapshot(): DerivativesHeatSnapshot {
+  const asset: DerivativesHeatAssetSnapshot = {
+    asset: "BTC",
+    symbol: "BTCUSDT_PERP",
+    price: 64000,
+    openInterestCurrent: 12_000_000_000,
+    openInterestChange4hPct: 8.5,
+    openInterestChange24hPct: 22.3,
+    fundingCurrent: 0.0012,
+    fundingZScore: 2.8,
+    predictedFundingCurrent: 0.0014,
+    liquidationLongUsd1h: 5_000_000,
+    liquidationShortUsd1h: 800_000,
+    liquidationLongUsd4h: 18_000_000,
+    liquidationShortUsd4h: 2_000_000,
+    liquidationImbalance: -0.8,
+    longShortRatio: 1.6,
+    assetHeatLabel: "Crowded longs",
+    assetHeatScore: 4,
+    assetSummary: "BTC longs look crowded."
+  };
+  return {
+    timestamp: "2026-07-03T09:00:00Z",
+    provider: "coinalyze",
+    status: "LongWipeoutRisk",
+    publicLabel: "Long wipeout risk below ⚠️",
+    summary: "BTC leverage looks long-heavy into a cautious tape.",
+    assets: [asset],
+    errors: [],
+    warnings: []
+  };
+}
+
+function makeUnavailableHeatSnapshot(): DerivativesHeatSnapshot {
+  return {
+    timestamp: "2026-07-03T09:00:00Z",
+    provider: "coinalyze",
+    status: "Unavailable",
+    publicLabel: "Unavailable ⚪",
+    summary: "Derivatives heat disabled by config.",
+    assets: [],
+    errors: [],
+    warnings: ["Derivatives heat disabled by config."]
+  };
+}
+
+function testActiveHeatDoesNotAddHeatRowToTelegram(): void {
+  // Attach the most extreme active heat to a result and verify neither
+  // Market Move nor Alpha Pulse heartbeat contains any "Heat" row.
+  const result = { ...sampleResult(70, "Risk-On"), derivativesHeat: makeActiveHeatSnapshot() };
+
+  const heartbeat = pulse(result);
+  assert.doesNotMatch(heartbeat, /[Hh]eat/,
+    "Active derivatives heat must not appear in Alpha Pulse heartbeat output.");
+  assert.doesNotMatch(heartbeat, /LongWipeoutRisk|wipeout|CrowdedLong|ShortSqueeze/i,
+    "Derivatives heat status labels must not appear in Alpha Pulse heartbeat output.");
+
+  const move = formatRegimeAlert(
+    result,
+    "Regime changed",
+    new Date(Date.now() + 15 * 60_000).toISOString(),
+    sampleResult(58, "Neutral / Chop", "2026-07-03T08:45:00Z"),
+    laneExplainer,
+    undefined,
+    freshMarketData,
+    marketMoveMajors()
+  );
+  assert.doesNotMatch(move, /[Hh]eat/,
+    "Active derivatives heat must not appear in Market Move output.");
+}
+
+function testActiveHeatDoesNotChangeActivityStateTempOrReason(): void {
+  // Two identical results; one has active "LongWipeoutRisk" heat, one has Unavailable heat.
+  // buildTempoTapeContext must produce identical activityState, activityReason, and tempo.
+  const baseResult = sampleResult(70, "Risk-On", "2026-07-03T09:00:00Z"); // London/NY overlap NOT active; "Mid London"
+  const withActive   = { ...baseResult, derivativesHeat: makeActiveHeatSnapshot() };
+  const withUnavail  = { ...baseResult, derivativesHeat: makeUnavailableHeatSnapshot() };
+  const withNone     = { ...baseResult };
+
+  const ctxActive  = buildTempoTapeContext(withActive,  null);
+  const ctxUnavail = buildTempoTapeContext(withUnavail, null);
+  const ctxNone    = buildTempoTapeContext(withNone,    null);
+
+  assert.equal(ctxActive.activityState, ctxUnavail.activityState,
+    "activityState must not differ between active and unavailable heat.");
+  assert.equal(ctxActive.activityState, ctxNone.activityState,
+    "activityState must not differ between active heat and no heat.");
+  assert.equal(ctxActive.activityReason, ctxUnavail.activityReason,
+    "activityReason must not differ between active and unavailable heat.");
+  assert.equal(ctxActive.activityReason, ctxNone.activityReason,
+    "activityReason must not differ between active heat and no heat.");
+  assert.equal(ctxActive.tempo, ctxUnavail.tempo,
+    "tempo must not differ between active and unavailable heat.");
+  assert.equal(ctxActive.tempo, ctxNone.tempo,
+    "tempo must not differ between active heat and no heat.");
+
+  // Verify no "derivatives heat" text escapes into any reason string.
+  assert.doesNotMatch(ctxActive.activityReason, /derivatives|heat/i,
+    "activityReason must not reference derivatives heat.");
+
+  // Also test with a previous result to exercise the scoreDelta path.
+  const prev = sampleResult(55, "Neutral / Chop", "2026-07-03T08:45:00Z");
+  const ctxDeltaActive  = buildTempoTapeContext(withActive,  prev);
+  const ctxDeltaUnavail = buildTempoTapeContext(withUnavail, prev);
+  assert.equal(ctxDeltaActive.activityState, ctxDeltaUnavail.activityState,
+    "activityState must be identical with/without heat when scoreDelta is present.");
+  assert.equal(ctxDeltaActive.tempo, ctxDeltaUnavail.tempo,
+    "tempo must be identical with/without heat when scoreDelta is present.");
+}
+
+function testDerivativesCollectionFieldsRemainsInResultObject(): void {
+  // Verify the snapshot fields are typed and accessible — collection/persistence path is intact.
+  // This is a structural/type proof; it does not contact any network.
+  const heat = makeActiveHeatSnapshot();
+  const result: RegimeScoreResult = { ...sampleResult(70, "Risk-On"), derivativesHeat: heat };
+
+  assert.equal(result.derivativesHeat?.status, "LongWipeoutRisk",
+    "derivativesHeat.status must be accessible on RegimeScoreResult for persistence.");
+  assert.equal(result.derivativesHeat?.assets[0]?.fundingZScore, 2.8,
+    "fundingZScore must be accessible on DerivativesHeatAssetSnapshot.");
+  assert.equal(result.derivativesHeat?.assets[0]?.openInterestChange24hPct, 22.3,
+    "openInterestChange24hPct must be accessible for research cohort.");
+  assert.equal(result.derivativesHeat?.assets[0]?.liquidationLongUsd4h, 18_000_000,
+    "liquidationLongUsd4h must be accessible for research cohort.");
+  assert.equal(result.derivativesHeat?.assets[0]?.liquidationImbalance, -0.8,
+    "liquidationImbalance must be accessible for research cohort.");
+  assert.equal(result.derivativesHeat?.assets[0]?.longShortRatio, 1.6,
+    "longShortRatio must be accessible for research cohort.");
+}
+
+
+
+
+testActiveHeatDoesNotAddHeatRowToTelegram();
+testActiveHeatDoesNotChangeActivityStateTempOrReason();
+testDerivativesCollectionFieldsRemainsInResultObject();
+
+console.log("Derivatives research isolation tests passed.");

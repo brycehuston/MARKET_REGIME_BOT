@@ -1116,12 +1116,8 @@ function shortAvoidLine(result: RegimeScoreResult, guidance: ActionGuidance): st
   return "Weak laggards";
 }
 
-function heatRows(result: RegimeScoreResult): Array<[string, string]> {
-  const heat = result.derivativesHeat;
-  if (!heat || heat.status === "Unavailable") return [];
-  if (!heat.publicLabel || heat.publicLabel.startsWith("Unavailable")) return [];
-  return [["Heat", heat.publicLabel]];
-}
+// heatRows removed: derivatives heat is research-only during collection phase.
+// Heat status must not appear in Telegram output until promoted from research.
 
 function defiLine(result: RegimeScoreResult): string | undefined {
   const defiStatus = result.defiConfirmation?.status ?? "Unavailable";
@@ -1353,7 +1349,6 @@ function buildActivityState(
     previousResult && (Math.abs(scoreDelta ?? 0) >= 10 || regimeChanged || leaderChanged)
   );
   const volume = volumeEvidence(result);
-  const activeHeat = hasActiveDerivativesHeat(result);
   const sessionPhase = session.sessionPhase;
 
   if (scoreDelta !== null && scoreDelta >= 15) return { state: "fast improvement", reason: "score increased by 15+" };
@@ -1373,9 +1368,9 @@ function buildActivityState(
     return { state: "high activity", reason: "overlap window with score/regime/leader movement" };
   }
 
-  if (volume.isStrong || activeHeat) {
-    if (isOpeningOrOverlap(sessionPhase)) return { state: "high activity", reason: volume.reason ?? "active derivatives heat" };
-    return { state: "activity rising", reason: volume.reason ?? "active derivatives heat" };
+  if (volume.isStrong) {
+    if (isOpeningOrOverlap(sessionPhase)) return { state: "high activity", reason: volume.reason ?? "strong volume" };
+    return { state: "activity rising", reason: volume.reason ?? "strong volume" };
   }
 
   if (volume.isWeak) {
@@ -1456,10 +1451,8 @@ function isFadeOrLate(sessionPhase: string): boolean {
   return sessionPhase === "London fade" || sessionPhase === "NY fade" || sessionPhase === "Late session" || sessionPhase === "Weekend late";
 }
 
-function hasActiveDerivativesHeat(result: RegimeScoreResult): boolean {
-  const status = result.derivativesHeat?.status;
-  return Boolean(status && status !== "Unavailable" && status !== "Clean");
-}
+// hasActiveDerivativesHeat removed: derivatives heat must not influence
+// activityState, activityReason, or tempo during the research collection phase.
 
 function volumeEvidence(result: RegimeScoreResult): { hasData: boolean; isStrong: boolean; isWeak: boolean; reason: string | null } {
   const component = result.components.find((item) => item.name.toLowerCase().includes("volume"));
