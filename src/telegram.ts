@@ -92,11 +92,8 @@ export function formatRegimeAlert(
   const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
 
   const directionIcon = dataStale ? "\u{1F504}" : marketMoveDirectionIcon(result, previousResult);
-  const statusEmoji = dataStale ? "\u{1F7E8}" : marketMoveStatusEmoji(result, previousResult);
-  const statusText = dataStale ? "noisy-neutral" : marketMoveStatusText(result, previousResult);
-  const changeIcon = dataStale ? "\u26A0\uFE0F" : "\u26A1";
   const event = dataStale
-    ? { icon: "\u26A0\uFE0F", label: "Move Unverified" }
+    ? { label: "Move Unverified" }
     : marketMoveEventPresentation(result, previousResult, regimeConfidence, previousConfidence);
 
   const changedRows: Array<[string, string]> = dataStale
@@ -125,37 +122,41 @@ export function formatRegimeAlert(
   ].join(" \u2022 ");
 
   const scoreDisplay = (previousResult && previousResult.score !== result.score)
-    ? `${previousResult.score} \u2192 ${result.score}`
-    : `${result.score}/100`;
+    ? `\u3010 ${previousResult.score} \u2192 ${result.score} \u3011`
+    : `\u3010 ${result.score}/100 \u3011`;
+
+  const statusText = dataStale ? "noisy / neutral" : marketMoveStatusText(result, previousResult);
 
   const lines = [
     ALERT_SEPARATOR,
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    pulseMainLine("\u{1F3AF}", "Score", scoreDisplay),
-    pulseTreeLine("\u2514\u2500", "Status", `${statusEmoji} ${statusText}`),
+    pulseMainLine("", "Score", scoreDisplay),
+    pulseTreeLine("\u2514\u2500", "Status", statusText),
     "",
-    pulseSectionLine(event.icon, event.label),
+    pulseSectionLine("\u{1F3AF}", `Signal: ${event.label}`),
     pulseTreeLine(
       "\u2514\u2500",
       "Confidence",
       dataStale ? "Degraded \u2014 stale data" : regimeConfidenceLabel(regimeConfidence)
     ),
     "",
-    pulseSectionLine(changeIcon, "What Changed"),
+    pulseSectionLine("\u{1F50D}", "What Changed"),
     ...formatPulseTreeRows(changedRows),
     "",
     pulseSectionLine("\u{1F310}", "Majors \u2022 Since Last Scan"),
     pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajorReturn(majors.btcReturnPct)),
     pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajorReturn(majors.ethReturnPct)),
     pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajorReturn(majors.solReturnPct)),
-    ...(showAction ? ["", pulseMainLine("\u{1F3AF}", "Action", currentAction)] : []),
+    ...(showAction ? ["", pulseMainLine("\u{1F9ED}", "Action", currentAction)] : []),
     "",
-    pulseTextLine("\u{1F4A1}", readLines[0] ?? "Market state changed."),
+    pulseSectionLine("\u{1F4A1}", "Read"),
+    pulseTreeTextLine(readLines.length > 1 ? "\u251C\u2500" : "\u2514\u2500", readLines[0] ?? "Market state changed."),
     ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
     "",
-    pulseMainLine("\u{1F30A}", "Context", marketContext),
+    pulseSectionLine("\u{1F30A}", "Context"),
+    pulseTreeLine(contextRows.length > 0 ? "\u251C\u2500" : "\u2514\u2500", "Market", marketContext),
     ...(contextRows.length > 0
       ? [pulseTreeLine("\u2514\u2500", "Event", contextRows.join(" \u2022 "))]
       : []),
@@ -318,24 +319,16 @@ export function deriveMarketMoveMajorsSinceLastScan(input?: AlphaPulseMajorsInpu
   };
 }
 
-function marketMoveStatusEmoji(result: RegimeScoreResult, previousResult?: RegimeScoreResult | null): string {
-  if (!previousResult) return "\u{1F7E8}";
-  const scoreDelta = result.score - previousResult.score;
-  const regimeDelta = regimeRank(result.regime) - regimeRank(previousResult.regime);
 
-  if (regimeDelta > 0 || scoreDelta > 0) return "\u{1F7E9}";
-  if (regimeDelta < 0 || scoreDelta < 0) return "\u{1F7E5}";
-  return "\u{1F7E8}";
-}
 
 function marketMoveStatusText(result: RegimeScoreResult, previousResult?: RegimeScoreResult | null): string {
-  if (!previousResult) return "noisy-neutral";
+  if (!previousResult) return "noisy / neutral";
   const scoreDelta = result.score - previousResult.score;
   const regimeDelta = regimeRank(result.regime) - regimeRank(previousResult.regime);
 
   if (regimeDelta > 0 || scoreDelta > 0) return "improving";
   if (regimeDelta < 0 || scoreDelta < 0) return "deteriorating";
-  return "noisy-neutral";
+  return "noisy / neutral";
 }
 
 function marketMoveDirectionIcon(
@@ -866,7 +859,8 @@ function treeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, value:
 }
 
 function pulseMainLine(icon: string, label: string, value: string): string {
-  return `<b>${icon} ${escapeHtml(smallCapsDisplay(label))}: ${escapeHtml(smallCapsDisplay(value))}</b>`;
+  const prefix = icon ? `${icon} ` : "";
+  return `<b>${prefix}${escapeHtml(smallCapsDisplay(label))}: ${escapeHtml(smallCapsDisplay(value))}</b>`;
 }
 
 function pulseSectionLine(icon: string, label: string): string {
