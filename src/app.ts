@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { BinanceProvider, BybitProvider, CoinGeckoProvider } from "./providers";
+import { BinanceProvider, BybitProvider, CoinGeckoProvider, CoinbaseProvider } from "./providers";
 import { DefiLlamaProvider } from "./defillama";
 import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
 import { FredContextProvider } from "./fred";
@@ -59,12 +59,20 @@ export class MarketRegimeBot {
   private readonly config = loadConfig();
   private readonly binance = new BinanceProvider(this.config.providers.binanceBaseUrls);
   private readonly bybit = new BybitProvider(this.config.providers.bybitBaseUrl);
+  private readonly coinbase = new CoinbaseProvider();
   private readonly coingecko = new CoinGeckoProvider(this.config);
   private readonly defiLlama = new DefiLlamaProvider(this.config);
   private readonly derivativesHeat = new CoinalyzeDerivativesHeatProvider(this.config);
   private readonly fred = new FredContextProvider();
   private readonly treasury = new TreasuryFiscalDataProvider();
   private readonly telegram = new TelegramClient();
+
+  private candleCache: {
+    timeframe: Timeframe;
+    provider: MarketDataProviderName;
+    bundle: CandleBundle;
+    expiresAtMs: number;
+  } | null = null;
 
   async runOnce(): Promise<void> {
     const state = loadState(this.config);
@@ -323,8 +331,31 @@ export class MarketRegimeBot {
     const errors: string[] = [];
 
     for (const provider of providers) {
+      if (
+        this.candleCache &&
+        this.candleCache.timeframe === timeframe &&
+        this.candleCache.provider === provider &&
+        Date.now() < this.candleCache.expiresAtMs
+      ) {
+        console.log(`Using cached historical candle bundle from ${provider} for ${timeframe}.`);
+        return {
+          candles: this.candleCache.bundle,
+          provider,
+          providerTimestamp: this.candleBundleProviderTimestamp(this.candleCache.bundle),
+          providerErrors: errors
+        };
+      }
+
       try {
         const candles = await this.fetchCandlesFromProvider(provider, timeframe);
+
+        this.candleCache = {
+          timeframe,
+          provider,
+          bundle: candles,
+          expiresAtMs: this.calculateCacheExpiryMs(candles, timeframe)
+        };
+
         return {
           candles,
           provider,
@@ -342,9 +373,16 @@ export class MarketRegimeBot {
     throw new Error(`All market-data providers failed. ${errors.join(" | ")}`);
   }
 
+  private calculateCacheExpiryMs(bundle: CandleBundle, timeframe: Timeframe): number {
+    const btcLast = bundle.btcUsdt[bundle.btcUsdt.length - 1];
+    if (!btcLast) return 0;
+    const durationMs = timeframe === "1h" ? 3600000 : timeframe === "4h" ? 14400000 : 86400000;
+    return btcLast.openTime + durationMs * 2;
+  }
+
   private marketDataProviderOrder(): MarketDataProviderName[] {
     const primary = this.config.providers.marketDataPrimary;
-    const priority: MarketDataProviderName[] = ["coingecko", "bybit", "binance"];
+    const priority: MarketDataProviderName[] = ["coingecko", "coinbase", "bybit", "binance"];
     return [primary, ...priority.filter((provider) => provider !== primary)];
   }
 
@@ -390,12 +428,14 @@ export class MarketRegimeBot {
       eth: this.config.assets.ethUsdt,
       sol: this.config.assets.solUsdt
     };
+    if (provider === "coinbase") return this.coinbase.fetchSpotPrices({ btc: "BTC-USD", eth: "ETH-USD", sol: "SOL-USD" });
     if (provider === "bybit") return this.bybit.fetchSpotPrices(symbols);
     return this.binance.fetchSpotPrices(symbols);
   }
 
   private fetchCandlesFromProvider(provider: MarketDataProviderName, timeframe: Timeframe): Promise<CandleBundle> {
     if (provider === "coingecko") return this.fetchCoinGeckoCandleBundle(timeframe);
+    if (provider === "coinbase") return this.fetchCoinbaseCandleBundle(timeframe);
     if (provider === "bybit") return this.fetchBybitCandleBundle(timeframe);
     return this.fetchBinanceCandleBundle(timeframe);
   }
@@ -410,6 +450,26 @@ export class MarketRegimeBot {
     ]);
 
     console.log("Market data provider: coingecko");
+    return {
+      btcUsdt,
+      ethUsdt,
+      solUsdt,
+      ethBtc: buildRatioCandles("ETHBTC", ethUsdt, btcUsdt),
+      solBtc: buildRatioCandles("SOLBTC", solUsdt, btcUsdt),
+      solEth: buildRatioCandles("SOLETH", solUsdt, ethUsdt)
+    };
+  }
+
+  private async fetchCoinbaseCandleBundle(timeframe: Timeframe): Promise<CandleBundle> {
+    const limit = this.config.candleLimit;
+
+    const [btcUsdt, ethUsdt, solUsdt] = await Promise.all([
+      this.coinbase.fetchSpotKlines("BTC-USD", timeframe, limit),
+      this.coinbase.fetchSpotKlines("ETH-USD", timeframe, limit),
+      this.coinbase.fetchSpotKlines("SOL-USD", timeframe, limit)
+    ]);
+
+    console.log("Market data provider: coinbase");
     return {
       btcUsdt,
       ethUsdt,

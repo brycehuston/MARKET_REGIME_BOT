@@ -399,3 +399,84 @@ function requiredPrice(value: number | null | undefined, symbol: string): number
   if (value === null || value === undefined) throw new Error(`Live spot price missing for ${symbol}.`);
   return value;
 }
+
+export class CoinbaseProvider {
+  private readonly baseUrl = "https://api.exchange.coinbase.com";
+
+  async fetchSpotKlines(symbol: string, timeframe: Timeframe, limit: number): Promise<Candle[]> {
+    const granularity = this.timeframeToGranularity(timeframe);
+    const url = `${this.baseUrl}/products/${symbol}/candles?granularity=${granularity}`;
+    const rows = await safeFetchJson<unknown[]>(url);
+    if (!Array.isArray(rows)) {
+      throw new Error(`Invalid Coinbase kline response for ${symbol}.`);
+    }
+
+    const now = Date.now();
+    return rows
+      .map((row) => this.parseKlineRow(symbol, timeframe, row))
+      .filter((candle) => candle.closeTime <= now)
+      .sort((a, b) => a.openTime - b.openTime)
+      .slice(-limit);
+  }
+
+  async fetchSpotPrices(symbols: { btc: string; eth: string; sol: string }): Promise<LiveSpotPriceSnapshot> {
+    const [btcRes, ethRes, solRes] = await Promise.all([
+      safeFetchJson<{ price?: string; time?: string }>(`${this.baseUrl}/products/${symbols.btc}/ticker`),
+      safeFetchJson<{ price?: string; time?: string }>(`${this.baseUrl}/products/${symbols.eth}/ticker`),
+      safeFetchJson<{ price?: string; time?: string }>(`${this.baseUrl}/products/${symbols.sol}/ticker`)
+    ]);
+
+    const timestamps = [btcRes.time, ethRes.time, solRes.time].map((t) => Date.parse(t ?? ""));
+    if (timestamps.some(t => !Number.isFinite(t) || t <= 0)) {
+      throw new Error("Coinbase spot ticker timestamp missing or invalid.");
+    }
+    const timestampMs = Math.min(...timestamps);
+
+    return {
+      provider: "coinbase",
+      timestamp: new Date(timestampMs).toISOString(),
+      btcPrice: requiredPrice(positiveNumber(btcRes.price), symbols.btc),
+      ethPrice: requiredPrice(positiveNumber(ethRes.price), symbols.eth),
+      solPrice: requiredPrice(positiveNumber(solRes.price), symbols.sol)
+    };
+  }
+
+  private parseKlineRow(symbol: string, timeframe: Timeframe, row: unknown): Candle {
+    if (!Array.isArray(row) || row.length < 6) {
+      throw new Error(`Invalid Coinbase kline row for ${symbol}.`);
+    }
+    const openTime = Number(row[0]) * 1000;
+    const low = Number(row[1]);
+    const high = Number(row[2]);
+    const open = Number(row[3]);
+    const close = Number(row[4]);
+    const volume = Number(row[5]);
+
+    if (!Number.isFinite(openTime) || openTime <= 0) throw new Error(`Invalid openTime in Coinbase kline for ${symbol}.`);
+    if (!Number.isFinite(open) || open <= 0) throw new Error(`Invalid open price in Coinbase kline for ${symbol}.`);
+    if (!Number.isFinite(high) || high <= 0) throw new Error(`Invalid high price in Coinbase kline for ${symbol}.`);
+    if (!Number.isFinite(low) || low <= 0) throw new Error(`Invalid low price in Coinbase kline for ${symbol}.`);
+    if (!Number.isFinite(close) || close <= 0) throw new Error(`Invalid close price in Coinbase kline for ${symbol}.`);
+    if (!Number.isFinite(volume) || volume < 0) throw new Error(`Invalid volume in Coinbase kline for ${symbol}.`);
+
+    const durationMs = timeframeToMs(timeframe);
+    return {
+      symbol,
+      interval: timeframe,
+      openTime,
+      low,
+      high,
+      open,
+      close,
+      volume,
+      closeTime: openTime + durationMs - 1,
+      quoteVolume: 0
+    };
+  }
+
+  private timeframeToGranularity(timeframe: Timeframe): number {
+    if (timeframe === "1h") return 3600;
+    if (timeframe === "1d") return 86400;
+    throw new Error(`Coinbase does not natively support timeframe: ${timeframe}`);
+  }
+}

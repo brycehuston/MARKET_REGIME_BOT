@@ -594,7 +594,7 @@ export interface AlertDecision {
   isCritical: boolean;
 }
 
-export type MarketDataProviderName = "coingecko" | "bybit" | "binance";
+export type MarketDataProviderName = "coingecko" | "bybit" | "binance" | "coinbase";
 
 export interface LiveSpotPriceSnapshot {
   provider: MarketDataProviderName;
