@@ -92,7 +92,9 @@ export function formatRegimeAlert(
   const useExplainer = shouldUseLaneExplainer(laneExplainer, dataStale);
 
   const directionIcon = dataStale ? "\u{1F504}" : marketMoveDirectionIcon(result, previousResult);
-  const changeIcon = directionIcon === "\u{1F504}" ? "\u26A1" : directionIcon;
+  const statusEmoji = dataStale ? "\u{1F7E8}" : marketMoveStatusEmoji(result, previousResult);
+  const statusText = dataStale ? "noisy-neutral" : marketMoveStatusText(result, previousResult);
+  const changeIcon = dataStale ? "\u26A0\uFE0F" : "\u26A1";
   const event = dataStale
     ? { icon: "\u26A0\uFE0F", label: "Move Unverified" }
     : marketMoveEventPresentation(result, previousResult, regimeConfidence, previousConfidence);
@@ -122,10 +124,17 @@ export function formatRegimeAlert(
     tempoContext.sessionPhase
   ].join(" \u2022 ");
 
+  const scoreDisplay = (previousResult && previousResult.score !== result.score)
+    ? `${previousResult.score} \u2192 ${result.score}`
+    : `${result.score}/100`;
+
   const lines = [
     ALERT_SEPARATOR,
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
+    "",
+    pulseMainLine("\u{1F3AF}", "Score", scoreDisplay),
+    pulseTreeLine("\u2514\u2500", "Status", `${statusEmoji} ${statusText}`),
     "",
     pulseSectionLine(event.icon, event.label),
     pulseTreeLine(
@@ -309,6 +318,26 @@ export function deriveMarketMoveMajorsSinceLastScan(input?: AlphaPulseMajorsInpu
   };
 }
 
+function marketMoveStatusEmoji(result: RegimeScoreResult, previousResult?: RegimeScoreResult | null): string {
+  if (!previousResult) return "\u{1F7E8}";
+  const scoreDelta = result.score - previousResult.score;
+  const regimeDelta = regimeRank(result.regime) - regimeRank(previousResult.regime);
+
+  if (regimeDelta > 0 || scoreDelta > 0) return "\u{1F7E9}";
+  if (regimeDelta < 0 || scoreDelta < 0) return "\u{1F7E5}";
+  return "\u{1F7E8}";
+}
+
+function marketMoveStatusText(result: RegimeScoreResult, previousResult?: RegimeScoreResult | null): string {
+  if (!previousResult) return "noisy-neutral";
+  const scoreDelta = result.score - previousResult.score;
+  const regimeDelta = regimeRank(result.regime) - regimeRank(previousResult.regime);
+
+  if (regimeDelta > 0 || scoreDelta > 0) return "improving";
+  if (regimeDelta < 0 || scoreDelta < 0) return "deteriorating";
+  return "noisy-neutral";
+}
+
 function marketMoveDirectionIcon(
   result: RegimeScoreResult,
   previousResult?: RegimeScoreResult | null
@@ -340,17 +369,17 @@ function marketMoveEventPresentation(
   }
 
   if (result.regime !== previousResult.regime) {
-    return { icon: "\u{1F504}", label: "Regime Change" };
+    return { icon: "\u26A1", label: "Regime Change" };
   }
 
   const scoreDelta = result.score - previousResult.score;
 
   if (scoreDelta > 0) {
-    return { icon: "\u{1F4C8}", label: "Score Recovery" };
+    return { icon: "\u26A1", label: "Score Recovery" };
   }
 
   if (scoreDelta < 0) {
-    return { icon: "\u{1F4C9}", label: "Score Slip" };
+    return { icon: "\u26A1", label: "Score Slip" };
   }
 
   if (result.leader !== previousResult.leader) {
@@ -373,7 +402,6 @@ function buildMarketMoveChangedRows(
 ): Array<[string, string]> {
   if (!previousResult) {
     return [
-      ["Score", `${result.score}/100`],
       ["Mode", result.regime],
       ["Risk", buildRiskLevelLabel(result)],
       ["Confidence", regimeConfidenceLabel(currentConfidence)],
@@ -383,12 +411,10 @@ function buildMarketMoveChangedRows(
 
   const rows: Array<[string, string]> = [];
 
-  if (result.score !== previousResult.score) {
-    rows.push(["Score", `${previousResult.score} \u2192 ${result.score}`]);
-  }
-
   if (result.regime !== previousResult.regime) {
     rows.push(["Mode", `${previousResult.regime} \u2192 ${result.regime}`]);
+  } else if (result.score !== previousResult.score) {
+    rows.push(["Mode", "No regime change"]);
   }
 
   const previousRisk = buildRiskLevelLabel(previousResult);

@@ -81,7 +81,6 @@ export function shouldSendTelegramHeartbeat(
 ): boolean {
   if (!config.alertRules.telegramHeartbeatEnabled) return false;
   if (!telegramConfigured) return false;
-  if (normalAlertWanted) return false;
 
   const intervalMinutes = config.alertRules.telegramHeartbeatIntervalMinutes;
   if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return false;

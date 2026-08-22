@@ -201,7 +201,9 @@ export class MarketRegimeBot {
             console.error(`Telegram send failed: ${message}`);
           }
         }
-      } else if (heartbeatWanted) {
+      }
+
+      if (heartbeatWanted) {
         try {
           await this.telegram.sendMessage(formatHeartbeatAlert(result, nextScanIso, state.currentResult, laneExplainer, eventContext, freshness, {
             timestamp: result.timestamp,

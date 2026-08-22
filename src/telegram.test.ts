@@ -323,10 +323,12 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
     "<b>📈 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>🔄 ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>⚡ ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
   assert.doesNotMatch(move, /Major Shift|ᴍᴀᴊᴏʀ ꜱʜɪꜰᴛ/);
 
-  assert.match(move, /ꜱᴄᴏʀᴇ: 58 → 61/);
+  assert.match(move, /🎯 ꜱᴄᴏʀᴇ: 58 → 61/);
+  assert.match(move, /└─ ꜱᴛᴀᴛᴜꜱ: 🟩 ɪᴍᴘʀᴏᴠɪɴɢ/);
+
   assert.match(
     move,
     /ᴍᴏᴅᴇ: ɴᴇᴜᴛʀᴀʟ \/ ᴄʜᴏᴘ → ʀɪꜱᴋ-ᴏɴ/
@@ -384,10 +386,12 @@ function testMarketMoveScoreSlipOmitsUnchangedState(): void {
     "<b>📉 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /📉 ꜱᴄᴏʀᴇ ꜱʟɪᴘ/);
-  assert.match(move, /ꜱᴄᴏʀᴇ: 70 → 64/);
+  assert.match(move, /⚡ ꜱᴄᴏʀᴇ ꜱʟɪᴘ/);
 
-  assert.doesNotMatch(move, /[├└]─ ᴍᴏᴅᴇ:/);
+  assert.match(move, /🎯 ꜱᴄᴏʀᴇ: 70 → 64/);
+  assert.match(move, /└─ ꜱᴛᴀᴛᴜꜱ: 🟥 ᴅᴇᴛᴇʀɪᴏʀᴀᴛɪɴɢ/);
+  assert.match(move, /ᴍᴏᴅᴇ: ɴᴏ ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ/);
+
   assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
   assert.doesNotMatch(move, /[├└]─ ʟᴇᴀᴅᴇʀ:/);
 
@@ -427,6 +431,8 @@ function testMarketMoveLeadershipOnlyChange(): void {
   );
 
   assert.match(move, /⚡ ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ/);
+  assert.match(move, /🎯 ꜱᴄᴏʀᴇ: 64\/100/);
+  assert.match(move, /└─ ꜱᴛᴀᴛᴜꜱ: 🟨 ɴᴏɪꜱʏ-ɴᴇᴜᴛʀᴀʟ/);
   assert.match(move, /ʟᴇᴀᴅᴇʀ: ʙᴛᴄ-ʟᴇᴅ → ꜱᴏʟ-ʟᴇᴅ/);
   assert.doesNotMatch(move, /[├└]─ ꜱᴄᴏʀᴇ:/);
   assert.match(move, /🎯 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
@@ -457,6 +463,8 @@ function testMarketMoveConfidenceOnlyChange(): void {
   );
 
   assert.match(move, /⚡ ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ/);
+  assert.match(move, /🎯 ꜱᴄᴏʀᴇ: 58\/100/);
+  assert.match(move, /└─ ꜱᴛᴀᴛᴜꜱ: 🟨 ɴᴏɪꜱʏ-ɴᴇᴜᴛʀᴀʟ/);
   assert.match(
     move,
     /ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ᴄᴏɴꜰɪʀᴍᴇᴅ ✅ → ɴᴏɪꜱʏ ⚠️/
