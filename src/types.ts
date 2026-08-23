@@ -419,6 +419,9 @@ export interface AccuracySnapshotFields extends MarketDataFreshnessFields {
   btcOiChange24hPct: number | null;
   ethOiChange24hPct: number | null;
   solOiChange24hPct: number | null;
+  retBtc1h?: number | null;
+  retEth1h?: number | null;
+  retSol1h?: number | null;
   btcPrice: number | null;
   ethPrice: number | null;
   solPrice: number | null;

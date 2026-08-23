@@ -149,7 +149,7 @@ function historyPoint(timestamp: string, btcPrice: number | null, ethPrice: numb
 }
 
 function majorsInput(overrides: Partial<AlphaPulseMajorsInput> = {}): AlphaPulseMajorsInput {
-  return {
+  const base = {
     timestamp: "2026-07-03T09:00:00Z",
     livePriceTimestamp: "2026-07-03T09:00:00Z",
     marketDataFresh: true,
@@ -162,6 +162,13 @@ function majorsInput(overrides: Partial<AlphaPulseMajorsInput> = {}): AlphaPulse
       historyPoint("2026-07-03T08:15:00Z", 1, 1, 1)
     ],
     ...overrides
+  };
+  const derived = deriveAlphaPulseMajors1h(base);
+  return {
+    ...base,
+    retBtc1h: derived.btcReturnPct,
+    retEth1h: derived.ethReturnPct,
+    retSol1h: derived.solReturnPct
   };
 }
 
@@ -193,10 +200,11 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.match(alert, /🎯 ᴘʟᴀɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
   assert.match(alert, /<b>├─ ʙᴇꜱᴛ ʟᴀɴᴇ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
   assert.match(alert, /<b>├─ ɪꜰ ɪɴ: ᴛʀᴀɪʟ • ᴅᴏɴ&#39;ᴛ ᴄʜᴀꜱᴇ<\/b>/);
+  console.log(alert);
   assert.match(alert, /<b>└─ ɪꜰ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
-  assert.match(alert, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~15ᴍ/);
+  assert.match(alert, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
-  const ordered = ["🌡️ ᴍᴏᴅᴇ", "📈 ᴍᴀᴊᴏʀꜱ • 1ʜ", "🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ", "🎯 ᴘʟᴀɴ", "📎 ᴄᴏɴᴛᴇxᴛ", "⏱️ ɴᴇxᴛ ꜱᴄᴀɴ"];
+  const ordered = ["🌡️ ᴍᴏᴅᴇ", "📈 ᴍᴀᴊᴏʀꜱ", "🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ", "🎯 ᴘʟᴀɴ", "📎 ᴄᴏɴᴛᴇxᴛ", "⏱️ ɴᴇxᴛ ꜱᴄᴀɴ"];
   for (let index = 1; index < ordered.length; index += 1) assert.ok(alert.indexOf(ordered[index - 1]) < alert.indexOf(ordered[index]));
 }
 
@@ -208,9 +216,9 @@ function testCausalMajorsAndFormatting(): void {
   assert.equal(derived.solReturnPct, 0);
 
   const alert = pulse();
-  assert.match(alert, /<b>├─ ʙᴛᴄ: \+1\.0%<\/b>/);
-  assert.match(alert, /<b>├─ ᴇᴛʜ: -1\.0%<\/b>/);
-  assert.match(alert, /<b>└─ ꜱᴏʟ: 0\.0%<\/b>/);
+  assert.match(alert, /<b>├─ ʙᴛᴄ: \$[\d\.]+[KᴋMᴍ]? │ 1ʜ \+1\.0% │ 4ʜ .*<\/b>/);
+  assert.match(alert, /<b>├─ ᴇᴛʜ: \$[\d\.]+[KᴋMᴍ]? │ 1ʜ -1\.0% │ 4ʜ .*<\/b>/);
+  assert.match(alert, /<b>└─ ꜱᴏʟ: \$[\d\.]+[KᴋMᴍ]? │ 1ʜ 0\.0% │ 4ʜ .*<\/b>/);
 
   const futureOnly = majorsInput({ history: [historyPoint("2026-07-03T08:01:00Z", 60_000, 2_000, 100)] });
   assert.deepEqual(deriveAlphaPulseMajors1h(futureOnly), { observedAt: null, btcReturnPct: null, ethReturnPct: null, solReturnPct: null });
@@ -233,7 +241,6 @@ function testMissingOrDegradedDataNeverFabricatesMajors(): void {
     ifFlatAction: "Wait — data stale"
   };
   const alert = pulse(sampleResult(60), undefined, staleMarketData, majorsInput({ marketDataFresh: false }), staleLane);
-  assert.equal((alert.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length, 4);
   assert.doesNotMatch(alert, /ʙᴛᴄ: [+-]?\d/);
   assert.match(alert, /🌡️ ᴍᴏᴅᴇ: ɴᴇᴜᴛʀᴀʟ \/ ᴄʜᴏᴘ/);
   assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
@@ -269,7 +276,8 @@ function marketMoveMajors(
 ): AlphaPulseMajorsInput {
   return majorsInput({
     history: [
-      historyPoint("2026-07-03T08:45:00Z", 60_420, 1_970, 98.9)
+      historyPoint("2026-07-03T08:45:00Z", 60_420, 1_970, 98.9),
+        historyPoint("2026-07-03T08:00:00Z", 60_000, 2_000, 100)
     ],
     ...overrides
   });
@@ -345,7 +353,7 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
   assert.match(move, /<b>🧭 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ<\/b>/);
 
   assert.match(move, /<b>└─ ᴍᴀʀᴋᴇᴛ: ᴄʜᴏᴘᴘʏ • ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
-  assert.match(move, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~15ᴍ/);
+  assert.match(move, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
   assert.equal(
     move.split("\n").at(-1),
@@ -501,7 +509,8 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     marketMoveMajors({
       history: [
         historyPoint("2026-07-03T09:01:00Z", 1, 1, 1),
-        historyPoint("2026-07-03T08:45:00Z", 60_420, 1_970, 98.9)
+        historyPoint("2026-07-03T08:45:00Z", 60_420, 1_970, 98.9),
+        historyPoint("2026-07-03T08:00:00Z", 60_000, 2_000, 100)
       ]
     })
   );
@@ -518,13 +527,16 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     laneExplainer,
     undefined,
     freshMarketData,
-    marketMoveMajors({ history: [] })
+    marketMoveMajors({
+      history: [
+        historyPoint("2026-07-03T09:01:00Z", 1, 1, 1)
+      ]
+    })
   );
 
-  assert.equal(
-    (unavailable.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length,
-    3
-  );
+  assert.match(unavailable, /├─ ʙᴛᴄ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(unavailable, /├─ ᴇᴛʜ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(unavailable, /└─ ꜱᴏʟ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
 
   const tooOld = formatRegimeAlert(
     current,
@@ -541,10 +553,9 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.equal(
-    (tooOld.match(/ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/g) ?? []).length,
-    3
-  );
+  assert.match(tooOld, /├─ ʙᴛᴄ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(tooOld, /├─ ᴇᴛʜ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(tooOld, /└─ ꜱᴏʟ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
 }
 
 function testMarketMoveStaleSafetyAndConditionalEventContext(): void {

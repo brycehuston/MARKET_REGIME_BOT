@@ -23,6 +23,9 @@ export interface AlphaPulseMajorsInput {
   btcPrice: number | null;
   ethPrice: number | null;
   solPrice: number | null;
+  retBtc1h?: number | null;
+  retEth1h?: number | null;
+  retSol1h?: number | null;
   history: LaneExplainerHistoryPoint[];
 }
 
@@ -149,6 +152,11 @@ export function formatRegimeAlert(
     pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajorReturn(majors.btcReturnPct)),
     pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajorReturn(majors.ethReturnPct)),
     pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajorReturn(majors.solReturnPct)),
+    "",
+    pulseSectionLine("\u{1F310}", "Broad Market"),
+    pulseTreeLine("\u251C\u2500", "BTC.D", formatAlphaPulseMajorReturn(result.global.btcDominancePct)),
+    pulseTreeLine("\u251C\u2500", "Stable.D", formatAlphaPulseMajorReturn(result.global.stablecoinDominancePct)),
+    pulseTreeLine("\u2514\u2500", "TOTAL", formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)),
     ...(showAction ? ["", pulseMainLine("\u{1F9ED}", "Action", currentAction)] : []),
     "",
     pulseSectionLine("\u{1F4A1}", "Read"),
@@ -183,7 +191,7 @@ export function formatHeartbeatAlert(
   const tempoContext = buildTempoTapeContext(result, previousResult);
   const regimeConfidence = deriveRegimeConfidence(result, previousResult, tempoContext);
   const nextScan = formatAlphaPulseNextScan(nextScanIso);
-  const majors = deriveAlphaPulseMajors1h(majorsInput);
+
   const eventContextSummary = eventContext ? formatEventContextSummary(eventContext) : null;
   const contextRows = buildContextRows(eventContext, eventContextSummary);
   const plan = dataStale ? "Protect / verify manually" : premiumHoldNowLabel(result, guidance);
@@ -198,10 +206,15 @@ export function formatHeartbeatAlert(
     pulseTreeLine("\u251C\u2500", "Score", `${result.score}/100`),
     pulseTreeLine("\u2514\u2500", "Confidence", regimeConfidenceLabel(regimeConfidence)),
     "",
-    pulseSectionLine("\u{1F4C8}", "Majors • 1H"),
-    pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajorReturn(majors.btcReturnPct)),
-    pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajorReturn(majors.ethReturnPct)),
-    pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajorReturn(majors.solReturnPct)),
+    pulseSectionLine("\u{1F4C8}", "Majors"),
+      pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajor(majorsInput?.btcPrice, majorsInput?.retBtc1h, laneExplainer?.retBtc4h, laneExplainer?.retBtc1d)),
+      pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajor(majorsInput?.ethPrice, majorsInput?.retEth1h, laneExplainer?.retEth4h, laneExplainer?.retEth1d)),
+      pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajor(majorsInput?.solPrice, majorsInput?.retSol1h, laneExplainer?.retSol4h, laneExplainer?.retSol1d)),
+    "",
+    pulseSectionLine("\u{1F310}", "Broad Market"),
+    pulseTreeLine("\u251C\u2500", "BTC.D", formatAlphaPulseMajorReturn(result.global.btcDominancePct)),
+    pulseTreeLine("\u251C\u2500", "Stable.D", formatAlphaPulseMajorReturn(result.global.stablecoinDominancePct)),
+    pulseTreeLine("\u2514\u2500", "TOTAL", formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)),
     "",
     pulseMainLine("\u{1F30A}", "Market State", marketState),
     pulseTreeLine("\u251C\u2500", "Session", tempoContext.sessionPhase),
@@ -1877,5 +1890,23 @@ function mixedWatch(): string[] {
 
 
 
+
+
+
+export function formatAlphaPulseMajor(price: number | null | undefined, ret1h: number | null | undefined, ret4h: number | null | undefined, ret1d: number | null | undefined): string {
+  if (price == null || !Number.isFinite(price)) return "Unavailable";
+  let pStr = `$${price.toFixed(2)}`;
+  if (price >= 1e9) {
+    pStr = `$${(price/1e9).toFixed(2)}B`;
+  } else if (price >= 1e6) {
+    pStr = `$${(price/1e6).toFixed(2)}M`;
+  } else if (price >= 1000) {
+    pStr = `$${(price/1000).toFixed(1)}K`;
+  }
+  const r1 = formatAlphaPulseMajorReturn(ret1h ?? null);
+  const r4 = formatAlphaPulseMajorReturn(ret4h ?? null);
+  const r24 = formatAlphaPulseMajorReturn(ret1d ?? null);
+  return `${pStr} \u2502 1H ${r1} \u2502 4H ${r4} \u2502 24H ${r24}`;
+}
 
 

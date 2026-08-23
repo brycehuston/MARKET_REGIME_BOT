@@ -11,7 +11,7 @@ import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveLaneExplainer } from "./laneExplainer";
 import { deriveLiquidityRotationTelemetry } from "./liquidityRotation";
 import { assessMarketDataFreshness, LIVE_PRICE_MAX_AGE_MINUTES } from "./marketDataFreshness";
-import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance } from "./telegram";
+import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance, deriveAlphaPulseMajors1h } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
 import {
   loadLaneExplainerHistory,
@@ -138,6 +138,19 @@ export class MarketRegimeBot {
       console.log(`Historical-data freshness: ${freshness.historicalDataFresh ? "FRESH" : "STALE"} (${freshness.historicalDataAgeMinutes ?? "unknown"}m old)`);
       console.log(`Live unchanged scans: ${freshness.livePriceUnchangedScanCount}`);
       const accuracyFields = this.buildAccuracySnapshotFields(snapshot.candles, snapshot.livePrices, result, guidance, state.currentResult, nextScanIso, freshness);
+      const _majors1h = deriveAlphaPulseMajors1h({
+        timestamp: result.timestamp,
+        livePriceTimestamp: freshness.livePriceTimestamp,
+        marketDataFresh: freshness.marketDataFresh,
+        scanIntervalMinutes: this.config.scanIntervalMinutes,
+        btcPrice: accuracyFields.btcPrice,
+        ethPrice: accuracyFields.ethPrice,
+        solPrice: accuracyFields.solPrice,
+        history: laneHistory
+      });
+      accuracyFields.retBtc1h = _majors1h.btcReturnPct;
+      accuracyFields.retEth1h = _majors1h.ethReturnPct;
+      accuracyFields.retSol1h = _majors1h.solReturnPct;
       const liquidityRotationTelemetry = deriveLiquidityRotationTelemetry({
         timestamp: result.timestamp,
         global: result.global,
@@ -198,6 +211,9 @@ export class MarketRegimeBot {
             btcPrice: accuracyFields.btcPrice,
             ethPrice: accuracyFields.ethPrice,
             solPrice: accuracyFields.solPrice,
+            retBtc1h: _majors1h.btcReturnPct,
+            retEth1h: _majors1h.ethReturnPct,
+            retSol1h: _majors1h.solReturnPct,
             history: laneHistory
           }));
             telegramSent = true;
@@ -221,6 +237,9 @@ export class MarketRegimeBot {
             btcPrice: accuracyFields.btcPrice,
             ethPrice: accuracyFields.ethPrice,
             solPrice: accuracyFields.solPrice,
+            retBtc1h: _majors1h.btcReturnPct,
+            retEth1h: _majors1h.ethReturnPct,
+            retSol1h: _majors1h.solReturnPct,
             history: laneHistory
           }));
           heartbeatSent = true;
