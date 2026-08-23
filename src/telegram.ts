@@ -124,19 +124,30 @@ export function formatRegimeAlert(
     tempoContext.sessionPhase
   ].join(" \u2022 ");
 
+  const directionSuffix = (previousResult && previousResult.score !== result.score)
+    ? (result.score > previousResult.score ? " \u2197" : " \u2198")
+    : "";
+
   const scoreDisplay = (previousResult && previousResult.score !== result.score)
-    ? `\u3010 ${previousResult.score} \u2192 ${result.score} \u3011`
+    ? `\u3010 ${previousResult.score} \u2192 ${result.score} \u3011${directionSuffix}`
     : `\u3010 ${result.score}/100 \u3011`;
 
   const statusText = dataStale ? "noisy / neutral" : marketMoveStatusText(result, previousResult);
+
+  const availableMajors: string[] = [];
+  if (!dataStale) {
+    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`BTC  ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
+    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`ETH  ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
+    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`SOL  ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
+  }
 
   const lines = [
     ALERT_SEPARATOR,
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    pulseMainLine("", "Score", scoreDisplay),
-    pulseTreeLine("\u2514\u2500", "Status", statusText),
+    `<b>📊 SCORE: ${scoreDisplay}</b>`,
+    `<b>\u2514 STATUS: ${statusText.toUpperCase()}</b>`,
     "",
     pulseSectionLine("\u{1F3AF}", `Signal: ${event.label}`),
     pulseTreeLine(
@@ -145,20 +156,17 @@ export function formatRegimeAlert(
       dataStale ? "Degraded \u2014 stale data" : regimeConfidenceLabel(regimeConfidence)
     ),
     "",
-    pulseSectionLine("\u{1F50D}", "What Changed"),
-    ...formatPulseTreeRows(changedRows),
-    "",
-    pulseSectionLine("\u{1F310}", "Majors \u2022 Since Last Scan"),
-    pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajorReturn(majors.btcReturnPct)),
-    pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajorReturn(majors.ethReturnPct)),
-    pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajorReturn(majors.solReturnPct)),
-    "",
-    pulseSectionLine("\u{1F310}", "Broad Market"),
-    pulseTreeLine("\u251C\u2500", "BTC.D", formatAlphaPulseMajorReturn(result.global.btcDominancePct)),
-    pulseTreeLine("\u251C\u2500", "Stable.D", formatAlphaPulseMajorReturn(result.global.stablecoinDominancePct)),
-    pulseTreeLine("\u2514\u2500", "TOTAL", formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)),
-    ...(showAction ? ["", pulseMainLine("\u{1F9ED}", "Action", currentAction)] : []),
-    "",
+    ...(changedRows.length > 0 ? [
+      pulseSectionLine("\u{1F50D}", "What Changed"),
+      ...formatPulseTreeRows(changedRows),
+      ""
+    ] : []),
+    ...(availableMajors.length > 0 ? [
+      `<b>\u{1F310} MAJORS \u2022 LAST SCAN</b>`,
+      ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"} ${line}</b>`),
+      ""
+    ] : []),
+    ...(showAction ? [pulseMainLine("\u{1F9ED}", "Action", currentAction), ""] : []),
     pulseSectionLine("\u{1F4A1}", "Read"),
     pulseTreeTextLine(readLines.length > 1 ? "\u251C\u2500" : "\u2514\u2500", readLines[0] ?? "Market state changed."),
     ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
@@ -202,19 +210,18 @@ export function formatHeartbeatAlert(
     `<b>${ALPHA_PULSE_HEADER}</b>`,
     ALERT_SEPARATOR,
     "",
-    pulseMainLine("\u{1F321}\uFE0F", "Mode", result.regime),
-    pulseTreeLine("\u251C\u2500", "Score", `${result.score}/100`),
-    pulseTreeLine("\u2514\u2500", "Confidence", regimeConfidenceLabel(regimeConfidence)),
+    `<b>\u{1F321} MODE: ${result.regime.toUpperCase()}</b>`,
+    `<b>\u251C SCORE: ${result.score}/100</b>`,
+    `<b>\u2514 CONFIDENCE: ${regimeConfidenceLabel(regimeConfidence).toUpperCase()}</b>`,
     "",
-    pulseSectionLine("\u{1F4C8}", "Majors"),
-      pulseTreeLine("\u251C\u2500", "BTC", formatAlphaPulseMajor(majorsInput?.btcPrice, majorsInput?.retBtc1h, laneExplainer?.retBtc4h, laneExplainer?.retBtc1d)),
-      pulseTreeLine("\u251C\u2500", "ETH", formatAlphaPulseMajor(majorsInput?.ethPrice, majorsInput?.retEth1h, laneExplainer?.retEth4h, laneExplainer?.retEth1d)),
-      pulseTreeLine("\u2514\u2500", "SOL", formatAlphaPulseMajor(majorsInput?.solPrice, majorsInput?.retSol1h, laneExplainer?.retSol4h, laneExplainer?.retSol1d)),
+    `<b>\u{1F4C8} MAJORS</b>`,
+      `<b>\u251C BTC  ${formatAlphaPulseMajor(majorsInput?.btcPrice, majorsInput?.retBtc1h, null, null)}</b>`,
+      `<b>\u251C ETH  ${formatAlphaPulseMajor(majorsInput?.ethPrice, majorsInput?.retEth1h, null, null)}</b>`,
+      `<b>\u2514 SOL  ${formatAlphaPulseMajor(majorsInput?.solPrice, majorsInput?.retSol1h, null, null)}</b>`,
     "",
-    pulseSectionLine("\u{1F310}", "Broad Market"),
-    pulseTreeLine("\u251C\u2500", "BTC.D", formatAlphaPulseMajorReturn(result.global.btcDominancePct)),
-    pulseTreeLine("\u251C\u2500", "Stable.D", formatAlphaPulseMajorReturn(result.global.stablecoinDominancePct)),
-    pulseTreeLine("\u2514\u2500", "TOTAL", formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)),
+    `<b>\u{1F310} BROAD MARKET</b>`,
+    `<b>\u251C TOTAL  ${formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)}</b>`,
+    `<b>\u2514 BTC.D ${formatAlphaPulseDominanceLevel(result.global.btcDominancePct)} \u2022 STABLE.D ${formatAlphaPulseDominanceLevel(result.global.stablecoinDominancePct)}</b>`,
     "",
     pulseMainLine("\u{1F30A}", "Market State", marketState),
     pulseTreeLine("\u251C\u2500", "Session", tempoContext.sessionPhase),
@@ -419,8 +426,6 @@ function buildMarketMoveChangedRows(
 
   if (result.regime !== previousResult.regime) {
     rows.push(["Mode", `${previousResult.regime} \u2192 ${result.regime}`]);
-  } else if (result.score !== previousResult.score) {
-    rows.push(["Mode", "No regime change"]);
   }
 
   const previousRisk = buildRiskLevelLabel(previousResult);
@@ -439,11 +444,6 @@ function buildMarketMoveChangedRows(
 
   if (result.leader !== previousResult.leader) {
     rows.push(["Leader", `${previousResult.leader} \u2192 ${result.leader}`]);
-  }
-
-  if (rows.length === 0) {
-    const fallback = parseReasonLines(alertReason)[0] ?? "Material market update";
-    rows.push(["Update", fallback]);
   }
 
   return rows;
@@ -1146,8 +1146,8 @@ function defiLine(result: RegimeScoreResult): string | undefined {
   }
 }
 function regimeConfidenceLabel(value: RegimeConfidence): string {
-  if (value === "Confirmed") return "Confirmed \u2705";
-  if (value === "Noisy") return "Noisy \u26A0\uFE0F";
+  if (value === "Confirmed") return "Confirmed";
+  if (value === "Noisy") return "Noisy";
   return "Caution";
 }
 
@@ -1896,17 +1896,26 @@ function mixedWatch(): string[] {
 export function formatAlphaPulseMajor(price: number | null | undefined, ret1h: number | null | undefined, ret4h: number | null | undefined, ret1d: number | null | undefined): string {
   if (price == null || !Number.isFinite(price)) return "Unavailable";
   let pStr = `$${price.toFixed(2)}`;
-  if (price >= 1e9) {
-    pStr = `$${(price/1e9).toFixed(2)}B`;
+  if (price >= 1e12) {
+    pStr = `$${(price / 1e12).toFixed(2)}T`;
+  } else if (price >= 1e9) {
+    pStr = `$${(price / 1e9).toFixed(2)}B`;
   } else if (price >= 1e6) {
-    pStr = `$${(price/1e6).toFixed(2)}M`;
+    pStr = `$${(price / 1e6).toFixed(2)}M`;
   } else if (price >= 1000) {
-    pStr = `$${(price/1000).toFixed(1)}K`;
+    pStr = `$${(price / 1000).toFixed(1)}K`;
   }
-  const r1 = formatAlphaPulseMajorReturn(ret1h ?? null);
-  const r4 = formatAlphaPulseMajorReturn(ret4h ?? null);
-  const r24 = formatAlphaPulseMajorReturn(ret1d ?? null);
-  return `${pStr} \u2502 1H ${r1} \u2502 4H ${r4} \u2502 24H ${r24}`;
+
+  if (ret1h === null || ret1h === undefined) return pStr;
+
+  const r1 = formatAlphaPulseMajorReturn(ret1h);
+  if (r1 === "Unavailable") return pStr;
+  return `${pStr} \u2022 1H ${r1}`;
+}
+
+export function formatAlphaPulseDominanceLevel(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "Unavailable";
+  return `${value.toFixed(1)}%`;
 }
 
 

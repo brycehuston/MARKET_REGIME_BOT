@@ -59,6 +59,26 @@ export class BinanceProvider {
     throw new Error(`All Binance spot-price endpoints failed. ${errors.join(" | ")}`);
   }
 
+  async fetchOrderBook(symbol: string): Promise<{ bids: number[][]; asks: number[][] }> {
+    const params = new URLSearchParams({ symbol, limit: "50" });
+    const errors: string[] = [];
+
+    for (const baseUrl of this.baseUrls) {
+      const url = `${baseUrl.replace(/\/$/, "")}/api/v3/depth?${params.toString()}`;
+      try {
+        const data = await safeFetchJson<{ bids: string[][]; asks: string[][] }>(url);
+        return {
+          bids: data.bids.map(b => [Number(b[0]), Number(b[1])]),
+          asks: data.asks.map(a => [Number(a[0]), Number(a[1])])
+        };
+      } catch (error) {
+        errors.push(`${baseUrl}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    throw new Error(`All Binance depth endpoints failed for ${symbol}. ${errors.join(" | ")}`);
+  }
+
   private parseKlineRow(symbol: string, interval: string, row: unknown): Candle {
     if (!Array.isArray(row) || row.length < 8) {
       throw new Error(`Invalid Binance kline row for ${symbol}.`);
@@ -146,6 +166,27 @@ export class BybitProvider {
       ethPrice: requiredPrice(bySymbol.get(symbols.eth), symbols.eth),
       solPrice: requiredPrice(bySymbol.get(symbols.sol), symbols.sol)
     };
+  }
+
+  async fetchOptions(baseCoin: string): Promise<Array<{ symbol: string; bidIv: number; askIv: number; iv: number; delta: number }>> {
+    const params = new URLSearchParams({ category: "option", baseCoin });
+    const url = `${this.baseUrl}/v5/market/tickers?${params.toString()}`;
+    const response = await safeFetchJson<any>(url);
+
+    if (response.retCode !== 0) {
+      throw new Error(`Bybit option ticker failed: ${response.retMsg ?? "unknown error"}.`);
+    }
+
+    const rows = response.result?.list;
+    if (!Array.isArray(rows)) return [];
+
+    return rows.map((row: any) => ({
+      symbol: String(row.symbol),
+      bidIv: Number(row.bidIv),
+      askIv: Number(row.askIv),
+      iv: Number(row.markIv),
+      delta: Number(row.delta)
+    })).filter((r: any) => Number.isFinite(r.iv) && Number.isFinite(r.delta));
   }
 
   private parseKlineRow(symbol: string, timeframe: Timeframe, row: unknown): Candle {
@@ -254,6 +295,41 @@ export class CoinGeckoProvider {
       btcPrice: requiredPrice(positiveNumber(response.bitcoin?.usd), "bitcoin"),
       ethPrice: requiredPrice(positiveNumber(response.ethereum?.usd), "ethereum"),
       solPrice: requiredPrice(positiveNumber(response.solana?.usd), "solana")
+    };
+  }
+
+  async fetchBreadth(): Promise<Array<{ id: string, symbol: string, currentPrice: number, priceChangePercentage24h: number, marketCap: number }>> {
+    const params = new URLSearchParams({
+      vs_currency: "usd",
+      order: "market_cap_desc",
+      per_page: "250",
+      page: "1",
+      sparkline: "false"
+    });
+    const url = `${this.baseUrl}/coins/markets?${params.toString()}`;
+    const response = await safeFetchJson<any[]>(url, this.headers(), 15000);
+    return response.map(item => ({
+      id: String(item.id),
+      symbol: String(item.symbol),
+      currentPrice: Number(item.current_price),
+      priceChangePercentage24h: Number(item.price_change_percentage_24h),
+      marketCap: Number(item.market_cap)
+    })).filter(item => Number.isFinite(item.currentPrice) && Number.isFinite(item.priceChangePercentage24h));
+  }
+
+  async fetchStablecoinPrices(): Promise<{ usdtPrice: number | null, usdcPrice: number | null }> {
+    const params = new URLSearchParams({
+      ids: "tether,usd-coin",
+      vs_currencies: "usd"
+    });
+    const response = await safeFetchJson<CoinGeckoSimplePriceResponse>(
+      `${this.baseUrl}/simple/price?${params.toString()}`,
+      this.headers(),
+      10000
+    );
+    return {
+      usdtPrice: positiveNumber(response.tether?.usd) ?? null,
+      usdcPrice: positiveNumber(response['usd-coin']?.usd) ?? null
     };
   }
 

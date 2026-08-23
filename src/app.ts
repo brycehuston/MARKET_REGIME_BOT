@@ -4,6 +4,7 @@ import { DefiLlamaProvider } from "./defillama";
 import { CoinalyzeDerivativesHeatProvider } from "./derivativesHeat";
 import { FredContextProvider } from "./fred";
 import { TreasuryFiscalDataProvider, mergeTreasuryLiquidityContext } from "./treasury";
+import { ResearchSensorsCollector } from "./researchSensors";
 import { buildRatioCandles } from "./indicators";
 import { loadConfig } from "./config";
 import { decideAlert, shouldSendTelegramHeartbeat } from "./alerts";
@@ -19,6 +20,7 @@ import {
   logAlert,
   logDerivativesHeat,
   logError,
+  logResearchSensors,
   logScore,
   logSnapshot,
   saveState,
@@ -66,6 +68,13 @@ export class MarketRegimeBot {
   private readonly fred = new FredContextProvider();
   private readonly treasury = new TreasuryFiscalDataProvider();
   private readonly telegram = new TelegramClient();
+  private readonly researchSensors = new ResearchSensorsCollector(
+    this.binance,
+    this.bybit,
+    this.coingecko,
+    this.fred,
+    this.defiLlama
+  );
 
   private candleCache: {
     timeframe: Timeframe;
@@ -266,6 +275,12 @@ export class MarketRegimeBot {
         eventContext
       );
       logSnapshot(this.config, result, accuracyFields, auditFields, laneExplainer, eventContext, liquidityRotationTelemetry);
+
+      this.researchSensors.collect().then(researchSnapshot => {
+        logResearchSensors(this.config, researchSnapshot);
+      }).catch(err => {
+        console.error(`Research sensors collection failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
 
       const nextState = updateStateAfterRun(state, result, decision, heartbeatSent);
       saveState(this.config, nextState);

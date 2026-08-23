@@ -50,7 +50,8 @@ const SERIES = {
   dollarProxy: "DTWEXBGS",
   walcl: "WALCL",
   rrp: "RRPONTSYD",
-  tga: "WTREGEN"
+  tga: "WTREGEN",
+  ndx: "NASDAQ100"
 } as const;
 
 type SeriesKey = keyof typeof SERIES;
@@ -175,6 +176,9 @@ function buildSnapshot(input: {
       vix: roundedValue(input.results.vix.latest),
       highYieldSpread: roundedValue(input.results.highYieldSpread.latest),
       dollarProxy: roundedValue(input.results.dollarProxy.latest),
+      ndxLevel: roundedValue(input.results.ndx.latest),
+      ndxChange1d: calculatePercentageChange(input.results.ndx.latest?.value, input.results.ndx.prior?.value),
+      ndxTrend: pairTrend(input.results.ndx),
       fredEnabled: input.enabled,
       fredSourceTimestamp: sourceTimestamp,
       fredIngestTimestamp: input.ingestTimestamp,
@@ -248,7 +252,13 @@ function calculateNetLiquidity(walcl: FredSeriesPoint | null, rrp: FredSeriesPoi
   const rrpValue = valueOf(rrp);
   const tgaValue = valueOf(tga);
   if (!isFiniteNumber(walclValue) || !isFiniteNumber(rrpValue) || !isFiniteNumber(tgaValue)) return null;
+
   return walclValue - rrpValue - tgaValue;
+}
+
+function calculatePercentageChange(current: number | null | undefined, previous: number | null | undefined): number | null {
+  if (!isFiniteNumber(current) || !isFiniteNumber(previous) || previous === 0) return null;
+  return ((current as number) / (previous as number) - 1) * 100;
 }
 
 function seriesDates(results: Record<SeriesKey, FredSeriesPair>): Record<string, string | null> {

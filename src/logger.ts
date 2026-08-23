@@ -398,3 +398,7 @@ export function logError(config: BotConfig, error: unknown): void {
   const message = error instanceof Error ? `${error.stack ?? error.message}` : String(error);
   appendLine(config.paths.errorLog, `[${nowIso()}] ${message}`);
 }
+
+export function logResearchSensors(config: BotConfig, snapshot: any): void {
+  appendLine(config.paths.researchSensorsJsonl ?? "data/research_sensors.jsonl", JSON.stringify(snapshot));
+}

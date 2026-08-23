@@ -99,7 +99,25 @@ export class DefiLlamaProvider {
         }
       };
     } catch {
-      return unavailableDefiConfirmation("DefiLlama confirmation failed safely.");
+      return unavailableDefiConfirmation("DefiLlama HTTP request failed or timed out.");
+    }
+  }
+
+  async fetchStablecoinSupplyMetrics(): Promise<{ totalStablecoinSupply: number | null }> {
+    if (!this.enabled) return { totalStablecoinSupply: null };
+    try {
+      const results = await safeFetchJson<unknown>(`${this.baseUrl}${ENDPOINTS.stablecoinAll}`);
+      const points = parseObjectPoints(results, [
+        "totalCirculatingUSD.peggedUSD",
+        "totalCirculating.peggedUSD",
+        "total.peggedUSD",
+        "totalCirculatingUSD",
+        "totalCirculating"
+      ]);
+      const latest = points[points.length - 1];
+      return { totalStablecoinSupply: latest ? latest.value : null };
+    } catch {
+      return { totalStablecoinSupply: null };
     }
   }
 

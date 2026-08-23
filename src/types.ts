@@ -159,6 +159,9 @@ export interface MacroContext {
   vix: number | null;
   highYieldSpread: number | null;
   dollarProxy: number | null;
+  ndxLevel: number | null;
+  ndxChange1d: number | null;
+  ndxTrend: MacroTrend;
   fredEnabled: boolean;
   fredSourceTimestamp: string | null;
   fredIngestTimestamp: string | null;
@@ -728,6 +731,7 @@ export interface BotConfig {
     snapshotJsonl: string;
     derivativesHeatCsv: string;
     derivativesHeatJsonl: string;
+    researchSensorsJsonl?: string;
     errorLog: string;
   };
 }
