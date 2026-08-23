@@ -1,4 +1,4 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import {
   BotConfig,
   Candle,
@@ -15,18 +15,20 @@ import { average, pctChange, readJsonFile, round, writeJsonFile } from "./utils"
 
 const CACHE_PATH = "data/derivatives_markets_cache.json";
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_VERSION = 2;
 const EXCHANGE_PRIORITY = ["binance", "bybit", "okx"];
 
 type AssetName = "BTC" | "ETH" | "SOL";
 
 type HeatDirection = "longs" | "shorts" | "clean" | "mixed" | "unavailable";
 
-interface MarketCache {
+export interface MarketCache {
+  version: number;
   generatedAt: string;
   mappings: Record<string, CachedMarket>;
 }
 
-interface CachedMarket {
+export interface CachedMarket {
   asset: string;
   symbol: string;
   exchange: string;
@@ -165,9 +167,12 @@ export class CoinalyzeDerivativesHeatProvider implements DerivativesHeatProvider
     }
 
     try {
-      const markets = await this.fetchEndpoint("/future-markets", {}, warnings);
-      const mappings = selectMarkets(markets, this.assets);
-      writeJsonFile(CACHE_PATH, { generatedAt: new Date().toISOString(), mappings });
+      const [exchangesRaw, marketsRaw] = await Promise.all([
+        this.fetchEndpoint("/exchanges", {}, warnings),
+        this.fetchEndpoint("/future-markets", {}, warnings)
+      ]);
+      const mappings = selectMarkets(marketsRaw, exchangesRaw, this.assets);
+      writeJsonFile(CACHE_PATH, { version: CACHE_VERSION, generatedAt: new Date().toISOString(), mappings });
       return mappings;
     } catch (error) {
       warnings.push(`Coinalyze market discovery failed; using cache if available. ${sanitizeError(error)}`);
@@ -272,20 +277,21 @@ export class CoinalyzeDerivativesHeatProvider implements DerivativesHeatProvider
   }
 }
 
-function readMarketCache(): MarketCache | null {
+export function readMarketCache(): MarketCache | null {
   const cache = readJsonFile<MarketCache | null>(CACHE_PATH, null);
-  if (!cache || !cache.mappings) return null;
+  if (!cache || cache.version !== CACHE_VERSION || !cache.mappings) return null;
   return cache;
 }
 
-function selectMarkets(marketsRaw: unknown, assets: string[]): Record<string, CachedMarket> {
+export function selectMarkets(marketsRaw: unknown, exchangesRaw: unknown, assets: string[]): Record<string, CachedMarket> {
   const rows = Array.isArray(marketsRaw) ? marketsRaw : [];
+  const exchangeMap = buildExchangeMap(exchangesRaw);
   const mappings: Record<string, CachedMarket> = {};
 
   for (const asset of assets) {
     const candidates = rows
       .filter((row): row is Record<string, unknown> => isRecord(row) && marketMatchesAsset(row, asset))
-      .sort(compareMarkets);
+      .sort((a, b) => compareMarkets(a, b, exchangeMap));
 
     const selected = candidates[0];
     if (!selected) continue;
@@ -293,34 +299,60 @@ function selectMarkets(marketsRaw: unknown, assets: string[]): Record<string, Ca
     const symbol = readString(selected.symbol) ?? readString(selected.code);
     if (!symbol) continue;
 
+    const code = readString(selected.exchange) ?? "";
+    const exchangeName = exchangeMap[code] ?? code;
+
     mappings[asset] = {
       asset,
       symbol,
-      exchange: readString(selected.exchange) ?? readString(selected.exchange_name) ?? "unknown"
+      exchange: exchangeName
     };
   }
 
   return mappings;
 }
 
-function marketMatchesAsset(row: Record<string, unknown>, asset: string): boolean {
-  const symbol = `${readString(row.symbol) ?? readString(row.code) ?? ""}`.toUpperCase();
-  const base = `${readString(row.base_asset) ?? readString(row.baseAsset) ?? readString(row.base) ?? ""}`.toUpperCase();
-  const quote = `${readString(row.quote_asset) ?? readString(row.quoteAsset) ?? readString(row.quote) ?? ""}`.toUpperCase();
-  const marketType = `${readString(row.market_type) ?? readString(row.type) ?? ""}`.toLowerCase();
-  const isPerpetual = row.is_perpetual === true || row.isPerpetual === true || marketType.includes("perpetual") || symbol.includes("PERP");
-  const isUsdt = quote === "USDT" || symbol.includes("USDT");
-  const isBase = base === asset || symbol.startsWith(`${asset}`);
-  return isBase && isUsdt && isPerpetual;
+export function buildExchangeMap(exchangesRaw: unknown): Record<string, string> {
+  const rows = Array.isArray(exchangesRaw) ? exchangesRaw : [];
+  const map: Record<string, string> = {};
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const code = readString(row.exchange_code);
+    const name = readString(row.name);
+    if (code && name) {
+      map[code] = name.toLowerCase();
+    }
+  }
+  return map;
 }
 
-function compareMarkets(a: Record<string, unknown>, b: Record<string, unknown>): number {
-  return exchangeRank(a) - exchangeRank(b);
+export function marketMatchesAsset(row: Record<string, unknown>, asset: string): boolean {
+  const base = readString(row.base_asset);
+  const quote = readString(row.quote_asset);
+  return base === asset && quote === "USDT" && row.is_perpetual === true;
 }
 
-function exchangeRank(row: Record<string, unknown>): number {
-  const exchange = `${readString(row.exchange) ?? readString(row.exchange_name) ?? ""}`.toLowerCase();
-  const index = EXCHANGE_PRIORITY.findIndex((name) => exchange.includes(name));
+export function compareMarkets(a: Record<string, unknown>, b: Record<string, unknown>, exchangeMap: Record<string, string>): number {
+  const rankA = exchangeRank(a, exchangeMap);
+  const rankB = exchangeRank(b, exchangeMap);
+  if (rankA !== rankB) return rankA - rankB;
+
+  const lsrA = a.has_long_short_ratio_data === true ? 1 : 0;
+  const lsrB = b.has_long_short_ratio_data === true ? 1 : 0;
+  if (lsrA !== lsrB) return lsrB - lsrA;
+
+  const ohlcvA = a.has_ohlcv_data === true ? 1 : 0;
+  const ohlcvB = b.has_ohlcv_data === true ? 1 : 0;
+  if (ohlcvA !== ohlcvB) return ohlcvB - ohlcvA;
+
+  return 0;
+}
+
+export function exchangeRank(row: Record<string, unknown>, exchangeMap: Record<string, string>): number {
+  const code = readString(row.exchange) ?? "";
+  const name = exchangeMap[code] ?? code.toLowerCase();
+
+  const index = EXCHANGE_PRIORITY.findIndex((p) => name.includes(p));
   return index === -1 ? 99 : index;
 }
 
