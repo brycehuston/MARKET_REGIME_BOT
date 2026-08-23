@@ -15,7 +15,7 @@ import { average, pctChange, readJsonFile, round, writeJsonFile } from "./utils"
 
 const CACHE_PATH = "data/derivatives_markets_cache.json";
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const EXCHANGE_PRIORITY = ["binance", "bybit", "okx"];
 
 type AssetName = "BTC" | "ETH" | "SOL";
@@ -317,7 +317,7 @@ export function buildExchangeMap(exchangesRaw: unknown): Record<string, string> 
   const map: Record<string, string> = {};
   for (const row of rows) {
     if (!isRecord(row)) continue;
-    const code = readString(row.exchange_code);
+    const code = readString(row.code);
     const name = readString(row.name);
     if (code && name) {
       map[code] = name.toLowerCase();

@@ -28,9 +28,9 @@ function testMarketMatchesAsset() {
 
 function testExchangeMappingAndPriority() {
   const exchangesRaw = [
-    { exchange_code: "A", name: "Binance" },
-    { exchange_code: "6", name: "Bybit" },
-    { exchange_code: "3", name: "OKX" }
+    { code: "A", name: "Binance" },
+    { code: "6", name: "Bybit" },
+    { code: "3", name: "OKX" }
   ];
 
   const map = buildExchangeMap(exchangesRaw);
@@ -87,9 +87,18 @@ function testCacheVersion() {
       mappings: { BTC: { asset: "BTC", symbol: "BTCUSDT", exchange: "binance" } }
     }));
 
+    assert.equal(readMarketCache(), null, "Version 2 market cache is rejected rather than trusted.");
+
+    // Write version 3
+    fs.writeFileSync(CACHE_PATH, JSON.stringify({
+      version: 3,
+      generatedAt: new Date().toISOString(),
+      mappings: { BTC: { asset: "BTC", symbol: "BTCUSDT", exchange: "binance" } }
+    }));
+
     const validCache = readMarketCache();
     assert.ok(validCache, "A current valid versioned cache remains reusable.");
-    assert.equal(validCache.version, 2);
+    assert.equal(validCache.version, 3);
 
   } finally {
     if (backup !== null) {
