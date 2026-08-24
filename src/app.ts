@@ -12,7 +12,7 @@ import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveLaneExplainer } from "./laneExplainer";
 import { deriveLiquidityRotationTelemetry } from "./liquidityRotation";
 import { assessMarketDataFreshness, LIVE_PRICE_MAX_AGE_MINUTES } from "./marketDataFreshness";
-import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance, deriveAlphaPulseMajors1h } from "./telegram";
+import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance, deriveAlphaPulseMajors1h, formatStartupAlert } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
 import {
   loadLaneExplainerHistory,
@@ -295,6 +295,17 @@ export class MarketRegimeBot {
   async runLoop(): Promise<void> {
     console.log("MARKET REGIME BOT started. Alert-only. No execution.");
     console.log(`Scan interval: ${this.config.scanIntervalMinutes} minutes`);
+
+    if (this.config.alertRules.sendStartupAlert) {
+      if (this.telegram.isConfigured()) {
+        try {
+          await this.telegram.sendMessage(formatStartupAlert(this.config.scanIntervalMinutes));
+          console.log("Sent startup alert to Telegram.");
+        } catch (error) {
+          console.error(`Telegram startup alert failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
 
     while (true) {
       const waitMs = this.msUntilNextScan(new Date());

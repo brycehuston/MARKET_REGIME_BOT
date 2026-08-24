@@ -106,7 +106,8 @@ export class DefiLlamaProvider {
   async fetchStablecoinSupplyMetrics(): Promise<{ totalStablecoinSupply: number | null }> {
     if (!this.enabled) return { totalStablecoinSupply: null };
     try {
-      const results = await safeFetchJson<unknown>(`${this.baseUrl}${ENDPOINTS.stablecoinAll}`);
+      // Note: Stablecoin endpoints are hosted on a different domain
+      const results = await safeFetchJson<unknown>(`https://stablecoins.llama.fi${ENDPOINTS.stablecoinAll}`);
       const points = parseObjectPoints(results, [
         "totalCirculatingUSD.peggedUSD",
         "totalCirculating.peggedUSD",

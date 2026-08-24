@@ -1,7 +1,7 @@
 import { formatEventContextSummary } from "./eventContext";
 import { ActionGuidance, EventContext, LaneExplainerHistoryPoint, LaneExplainerResult, LeaderName, MarketDataFreshnessFields, RegimeConfidence, RegimeScoreResult } from "./types";
 
-const ALERT_SEPARATOR = "\u2501".repeat(22);
+const ALERT_SEPARATOR = "\u2501".repeat(20);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
 const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01";
 const ALPHA_PULSE_HEADER = "\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07";
@@ -136,9 +136,9 @@ export function formatRegimeAlert(
 
   const availableMajors: string[] = [];
   if (!dataStale) {
-    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`BTC  ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
-    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`ETH  ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
-    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`SOL  ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
+    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`ʙᴛᴄ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
+    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`ᴇᴛʜ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
+    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱᴏʟ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
   }
 
   const lines = [
@@ -146,8 +146,8 @@ export function formatRegimeAlert(
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    `<b>📊 SCORE: ${scoreDisplay}</b>`,
-    `<b>\u2514 STATUS: ${statusText.toUpperCase()}</b>`,
+    `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>`,
+    `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
     "",
     pulseSectionLine("\u{1F3AF}", `Signal: ${event.label}`),
     pulseTreeLine(
@@ -162,7 +162,7 @@ export function formatRegimeAlert(
       ""
     ] : []),
     ...(availableMajors.length > 0 ? [
-      `<b>\u{1F310} MAJORS \u2022 LAST SCAN</b>`,
+      `<b>\u{1F310} ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ</b>`,
       ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"} ${line}</b>`),
       ""
     ] : []),
@@ -210,18 +210,18 @@ export function formatHeartbeatAlert(
     `<b>${ALPHA_PULSE_HEADER}</b>`,
     ALERT_SEPARATOR,
     "",
-    `<b>\u{1F321} MODE: ${result.regime.toUpperCase()}</b>`,
-    `<b>\u251C SCORE: ${result.score}/100</b>`,
-    `<b>\u2514 CONFIDENCE: ${regimeConfidenceLabel(regimeConfidence).toUpperCase()}</b>`,
+    `<b>\u{1F321} ᴍᴏᴅᴇ: ${smallCapsDisplay(result.regime)}</b>`,
+    `<b>\u251C ꜱᴄᴏʀᴇ: ${result.score}/100</b>`,
+    `<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ${smallCapsDisplay(regimeConfidenceLabel(regimeConfidence))}</b>`,
     "",
-    `<b>\u{1F4C8} MAJORS</b>`,
-      `<b>\u251C BTC  ${formatAlphaPulseMajor(majorsInput?.btcPrice, majorsInput?.retBtc1h, null, null)}</b>`,
-      `<b>\u251C ETH  ${formatAlphaPulseMajor(majorsInput?.ethPrice, majorsInput?.retEth1h, null, null)}</b>`,
-      `<b>\u2514 SOL  ${formatAlphaPulseMajor(majorsInput?.solPrice, majorsInput?.retSol1h, null, null)}</b>`,
+    `<b>\u{1F4C8} ᴍᴀᴊᴏʀꜱ</b>`,
+    `<b>\u251C ʙᴛᴄ: ${formatAlphaPulseMajor(majorsInput?.btcPrice, majorsInput?.retBtc1h, null, null)}</b>`,
+    `<b>\u251C ᴇᴛʜ: ${formatAlphaPulseMajor(majorsInput?.ethPrice, majorsInput?.retEth1h, null, null)}</b>`,
+    `<b>\u2514 ꜱᴏʟ: ${formatAlphaPulseMajor(majorsInput?.solPrice, majorsInput?.retSol1h, null, null)}</b>`,
     "",
-    `<b>\u{1F310} BROAD MARKET</b>`,
-    `<b>\u251C TOTAL  ${formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)}</b>`,
-    `<b>\u2514 BTC.D ${formatAlphaPulseDominanceLevel(result.global.btcDominancePct)} \u2022 STABLE.D ${formatAlphaPulseDominanceLevel(result.global.stablecoinDominancePct)}</b>`,
+    `<b>\u{1F310} ʙʀᴏᴀᴅ ᴍᴀʀᴋᴇᴛ</b>`,
+    `<b>\u251C ᴛᴏᴛᴀʟ ${formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)}</b>`,
+    `<b>\u2514 ʙᴛᴄ.ᴅ ${formatAlphaPulseDominanceLevel(result.global.btcDominancePct)} \u2022 ꜱᴛᴀʙʟᴇ.ᴅ ${formatAlphaPulseDominanceLevel(result.global.stablecoinDominancePct)}</b>`,
     "",
     pulseMainLine("\u{1F30A}", "Market State", marketState),
     pulseTreeLine("\u251C\u2500", "Session", tempoContext.sessionPhase),
@@ -271,7 +271,7 @@ export function deriveAlphaPulseMajors1h(input?: AlphaPulseMajorsInput): AlphaPu
 }
 
 export function formatAlphaPulseMajorReturn(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "Unavailable";
+  if (value === null || !Number.isFinite(value)) return smallCapsDisplay("Unavailable");
   const rounded = Math.abs(value) < 0.05 ? 0 : Number(value.toFixed(1));
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`;
 }
@@ -884,7 +884,7 @@ function pulseTreeLine(branch: "\u251C\u2500" | "\u2514\u2500", label: string, v
   return `<b>${branch} ${escapeHtml(smallCapsDisplay(label))}: ${escapeHtml(smallCapsDisplay(value))}</b>`;
 }
 
-function smallCapsDisplay(value: string): string {
+export function smallCapsDisplay(value: string): string {
   const map: Record<string, string> = {
     a: "\u1D00", b: "\u0299", c: "\u1D04", d: "\u1D05", e: "\u1D07", f: "\uA730", g: "\u0262",
     h: "\u029C", i: "\u026A", j: "\u1D0A", k: "\u1D0B", l: "\u029F", m: "\u1D0D", n: "\u0274",
@@ -1894,7 +1894,7 @@ function mixedWatch(): string[] {
 
 
 export function formatAlphaPulseMajor(price: number | null | undefined, ret1h: number | null | undefined, ret4h: number | null | undefined, ret1d: number | null | undefined): string {
-  if (price == null || !Number.isFinite(price)) return "Unavailable";
+  if (price == null || !Number.isFinite(price)) return smallCapsDisplay("Unavailable");
   let pStr = `$${price.toFixed(2)}`;
   if (price >= 1e12) {
     pStr = `$${(price / 1e12).toFixed(2)}T`;
@@ -1909,13 +1909,31 @@ export function formatAlphaPulseMajor(price: number | null | undefined, ret1h: n
   if (ret1h === null || ret1h === undefined) return pStr;
 
   const r1 = formatAlphaPulseMajorReturn(ret1h);
-  if (r1 === "Unavailable") return pStr;
-  return `${pStr} \u2022 1H ${r1}`;
+  if (r1 === smallCapsDisplay("Unavailable")) return pStr;
+  return `${pStr} \u2022 1\u029C ${r1}`;
 }
 
 export function formatAlphaPulseDominanceLevel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "Unavailable";
+  if (value == null || !Number.isFinite(value)) return smallCapsDisplay("Unavailable");
   return `${value.toFixed(1)}%`;
+}
+
+export function formatStartupAlert(scanIntervalMinutes: number): string {
+  const nextScan = `~${scanIntervalMinutes}\u1D0D`;
+  return [
+    "<b>─────────────</b>",
+    "<b>ᴀʟᴘʜᴀ ᴘᴜʟꜱᴇ │</b> ᴏɴʟɪɴᴇ <b>◉</b>",
+    "<b>────────────╮</b>",
+    " <b>≋ ᴘᴜʟꜱᴇ ꜱᴇɴꜱᴏʀꜱ</b>:",
+    "<b>├─ ʀᴇɢɪᴍᴇ</b>",
+    "<b>├─ ᴅᴇʀɪᴠᴀᴛɪᴠᴇꜱ</b>",
+    "<b>└─ ʀɪꜱᴋ</b>",
+    "",
+    `<b>◷ ɴᴇxᴛ ꜱᴄᴀɴ │</b> ${nextScan}`,
+    "<b>─────────────</b>",
+    "ᴘᴜʟꜱᴇ <b>©</b> ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ <b>|</b> v1.01",
+    "╰<b>───────</b>╯"
+  ].join("\n");
 }
 
 

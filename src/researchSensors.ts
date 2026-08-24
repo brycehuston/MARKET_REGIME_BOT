@@ -129,10 +129,10 @@ export class ResearchSensorsCollector {
 
         breadth = {
           status: "OK",
-          universeSize: 250, // Top 250 requested
+          universeSize: data.length, // use actual observed universe size
           validAssetCount: nonStables.length,
-          pctPositive1h: null, // 1h not provided by current endpoint
-          pctPositive4h: null, // 4h not provided by CoinGecko API standard fields
+          pctPositive1h: null,
+          pctPositive4h: null,
           pctPositive24h: nonStables.length > 0 ? (advancing / nonStables.length) * 100 : null,
           medianReturn1h: null,
           medianReturn4h: null,
@@ -142,8 +142,8 @@ export class ResearchSensorsCollector {
           pctOutperformingBtc1h: null,
           pctOutperformingBtc4h: null,
           pctOutperformingBtc24h: (outperformingBtc24h !== null && nonStables.length > 0) ? (outperformingBtc24h / nonStables.length) * 100 : null,
-          breadthState: "Neutral", // Placeholder state logic
-          breadthImpulse: "None",
+          breadthState: null, // Placeholder removed
+          breadthImpulse: null, // Placeholder removed
           unavailabilityReason: "1h/4h returns require separate historic endpoints per coin on CoinGecko. Limited by API quota."
         };
       } else {
@@ -162,8 +162,12 @@ export class ResearchSensorsCollector {
       buyImpactBpsFor50kUsdBtc: null, sellImpactBpsFor50kUsdBtc: null,
       orderBookImbalanceBtc: null, ofiBtc: null, unavailabilityReason: null
     };
+    let binanceError: string | null = null;
     try {
-      const btcOb = await this.binance.fetchOrderBook("BTCUSDT").catch(() => null);
+      const btcOb = await this.binance.fetchOrderBook("BTCUSDT").catch((err) => {
+        binanceError = err instanceof Error ? err.message : String(err);
+        return null;
+      });
       if (btcOb && btcOb.bids.length > 0 && btcOb.asks.length > 0) {
         const bestBid = btcOb.bids[0][0];
         const bestAsk = btcOb.asks[0][0];
@@ -227,7 +231,7 @@ export class ResearchSensorsCollector {
           unavailabilityReason: "OFI requires consecutive snapshots; currently implemented as point-in-time"
         };
       } else {
-        liquidity.unavailabilityReason = "BTC Order book empty or failed to fetch";
+        liquidity.unavailabilityReason = binanceError ? `Binance API failed: ${binanceError}` : "BTC Order book empty or failed to fetch";
       }
     } catch (err) {
       liquidity.unavailabilityReason = `Liquidity error: ${err instanceof Error ? err.message : String(err)}`;
@@ -248,10 +252,18 @@ export class ResearchSensorsCollector {
       shortTermIvBtc: null, mediumTermIvBtc: null, termStructureSlopeBtc: null, putCallSkewBtc: null,
       unavailabilityReason: null
     };
+    let bybitBtcError: string | null = null;
+    let bybitEthError: string | null = null;
     try {
       const [btcOpt, ethOpt] = await Promise.all([
-        this.bybit.fetchOptions("BTC").catch(() => []),
-        this.bybit.fetchOptions("ETH").catch(() => [])
+        this.bybit.fetchOptions("BTC").catch((err) => {
+          bybitBtcError = err instanceof Error ? err.message : String(err);
+          return [];
+        }),
+        this.bybit.fetchOptions("ETH").catch((err) => {
+          bybitEthError = err instanceof Error ? err.message : String(err);
+          return [];
+        })
       ]);
 
       const getAtmIv = (opts: any[]) => {
@@ -270,7 +282,9 @@ export class ResearchSensorsCollector {
         mediumTermIvBtc: null,
         termStructureSlopeBtc: null,
         putCallSkewBtc: null, // No put/call flag in current provider ticker
-        unavailabilityReason: "Term structure and skew require parsing expiration and option types which aren't in the current simplified ticker."
+        unavailabilityReason: bybitBtcError || bybitEthError
+          ? `Bybit API failed: BTC=${bybitBtcError}, ETH=${bybitEthError}`
+          : "Term structure and skew require parsing expiration and option types which aren't in the current simplified ticker."
       };
     } catch (err) {
       options.unavailabilityReason = `Options error: ${err instanceof Error ? err.message : String(err)}`;

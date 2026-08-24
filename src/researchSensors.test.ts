@@ -64,6 +64,8 @@ function runTests() {
     assert.strictEqual(snapshot.breadth.pctPositive24h, (2/3) * 100);
     assert.strictEqual(snapshot.breadth.medianReturn24h, 5); // returns are [-2, 5, 10]
     assert.strictEqual(snapshot.breadth.pctOutperformingBtc24h, (1/3) * 100); // Only SOL outperformed BTC
+    assert.strictEqual(snapshot.breadth.breadthState, null);
+    assert.strictEqual(snapshot.breadth.breadthImpulse, null);
 
     // Liquidity assertions
     assert.strictEqual(snapshot.liquidity.status, "OK");

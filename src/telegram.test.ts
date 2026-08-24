@@ -185,15 +185,14 @@ function pulse(
 function testLockedShellRuntimeValuesAndOrder(): void {
   const alert = pulse();
   const lines = alert.split("\n");
-  assert.equal(lines[0], "\u2501".repeat(22));
+  assert.equal(lines[0], "\u2501".repeat(20));
   assert.equal(lines[1], "<b>\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07</b>");
-  assert.equal(lines[2], "\u2501".repeat(22));
-  assert.equal(lines.at(-2), "\u2501".repeat(22));
-  assert.equal(lines.at(-1), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01");
+  assert.equal(lines[2], "\u2501".repeat(20));
+  assert.deepEqual(lines.slice(-2), ["\u2501".repeat(20), "ᴘᴜʟꜱᴇ © ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ | v1.01"]);
 
-  assert.match(alert, /<b>🌡 MODE: RISK-ON<\/b>/u);
-  assert.match(alert, /<b>\u251C SCORE: 70\/100<\/b>/);
-  assert.match(alert, /<b>\u2514 CONFIDENCE: NOISY<\/b>/);
+  assert.match(alert, /<b>\u{1F321} ᴍᴏᴅᴇ: ʀɪꜱᴋ-ᴏɴ<\/b>/u);
+  assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
+  assert.match(alert, /<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
 
   assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴄʜᴏᴘᴘʏ/);
   assert.match(alert, /<b>├─ ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
@@ -205,7 +204,7 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.match(alert, /<b>└─ ɪꜰ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
   assert.match(alert, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
-  const ordered = ["\u{1F321} MODE", "\u{1F4C8} MAJORS", "\u{1F30A} ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ", "\u{1F3AF} ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "\u23F1\uFE0F ɴᴇxᴛ ꜱᴄᴀɴ"];
+  const ordered = ["\u{1F321} ᴍᴏᴅᴇ", "\u{1F4C8} ᴍᴀᴊᴏʀꜱ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ", "\u{1F3AF} ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "\u23F1\uFE0F ɴᴇxᴛ ꜱᴄᴀɴ"];
   for (let index = 1; index < ordered.length; index += 1) assert.ok(alert.indexOf(ordered[index - 1]) !== -1 && alert.indexOf(ordered[index - 1]) < alert.indexOf(ordered[index]));
 }
 
@@ -217,9 +216,9 @@ function testCausalMajorsAndFormatting(): void {
   assert.equal(derived.solReturnPct, 0);
 
   const alert = pulse();
-  assert.ok(alert.includes("<b>\u251C BTC  $60.6K \u2022 1H +1.0%</b>"));
-  assert.ok(alert.includes("<b>\u251C ETH  $2.0K \u2022 1H -1.0%</b>"));
-  assert.ok(alert.includes("<b>\u2514 SOL  $100.00 \u2022 1H 0.0%</b>"));
+  assert.ok(alert.includes("<b>\u251C ʙᴛᴄ: $60.6K \u2022 1\u029C +1.0%</b>"));
+  assert.ok(alert.includes("<b>\u251C ᴇᴛʜ: $2.0K \u2022 1\u029C -1.0%</b>"));
+  assert.ok(alert.includes("<b>\u2514 ꜱᴏʟ: $100.00 \u2022 1\u029C 0.0%</b>"));
 
   const futureOnly = majorsInput({ history: [historyPoint("2026-07-03T08:01:00Z", 60_000, 2_000, 100)] });
   assert.deepEqual(deriveAlphaPulseMajors1h(futureOnly), { observedAt: null, btcReturnPct: null, ethReturnPct: null, solReturnPct: null });
@@ -243,7 +242,7 @@ function testMissingOrDegradedDataNeverFabricatesMajors(): void {
   };
   const alert = pulse(sampleResult(60), undefined, staleMarketData, majorsInput({ marketDataFresh: false }), staleLane);
   assert.doesNotMatch(alert, /ʙᴛᴄ: [+-]?\d/);
-  assert.match(alert, /<b>\u251C SCORE: 60\/100<\/b>/);
+  assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 60\/100<\/b>/);
   assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
   assert.match(alert, /<b>├─ ʙᴇꜱᴛ ʟᴀɴᴇ: ᴅᴀᴛᴀ ꜱᴛᴀʟᴇ<\/b>/);
 }
@@ -336,8 +335,8 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
   assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
   assert.doesNotMatch(move, /Major Shift|ᴍᴀᴊᴏʀ ꜱʜɪꜰᴛ/);
 
-  assert.match(move, /<b>📊 SCORE: 【 58 → 61 】 ↗<\/b>/);
-  assert.ok(move.includes("<b>\u2514 STATUS: IMPROVING</b>"));
+  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 58 → 61 】 ↗<\/b>/);
+  assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɪᴍᴘʀᴏᴠɪɴɢ</b>"));
 
   assert.match(
     move,
@@ -346,10 +345,10 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
 
   assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
 
-  assert.match(move, /<b>🌐 MAJORS • LAST SCAN<\/b>/u);
-  assert.ok(move.includes("<b>\u251C BTC  +0.3%</b>"));
-  assert.ok(move.includes("<b>\u251C ETH  +0.5%</b>"));
-  assert.ok(move.includes("<b>\u2514 SOL  +1.1%</b>"));
+  assert.match(move, /<b>\u{1F310} ᴍᴀᴊᴏʀꜱ • ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/u);
+  assert.ok(move.includes("<b>\u251C ʙᴛᴄ +0.3%</b>"));
+  assert.ok(move.includes("<b>\u251C ᴇᴛʜ +0.5%</b>"));
+  assert.ok(move.includes("<b>\u2514 ꜱᴏʟ +1.1%</b>"));
 
   assert.match(move, /<b>🧭 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ<\/b>/);
 
@@ -398,8 +397,8 @@ function testMarketMoveScoreSlipOmitsUnchangedState(): void {
 
   assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ꜱᴄᴏʀᴇ ꜱʟɪᴘ<\/b>/);
 
-  assert.match(move, /<b>📊 SCORE: 【 70 → 64 】 ↘<\/b>/);
-  assert.ok(move.includes("<b>\u2514 STATUS: DETERIORATING</b>"));
+  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 70 → 64 】 ↘<\/b>/);
+  assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ᴅᴇᴛᴇʀɪᴏʀᴀᴛɪɴɢ</b>"));
   assert.doesNotMatch(move, /ᴍᴏᴅᴇ: ɴᴏ ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ/);
 
   assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
@@ -441,10 +440,10 @@ function testMarketMoveLeadershipOnlyChange(): void {
   );
 
   assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ<\/b>/);
-  assert.match(move, /<b>📊 SCORE: 【 64\/100 】<\/b>/);
-  assert.ok(move.includes("<b>\u2514 STATUS: NOISY / NEUTRAL</b>"));
+  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 64\/100 】<\/b>/);
+  assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɴᴏɪꜱʏ \/ ɴᴇᴜᴛʀᴀʟ</b>"));
   assert.match(move, /ʟᴇᴀᴅᴇʀ: ʙᴛᴄ-ʟᴇᴅ → ꜱᴏʟ-ʟᴇᴅ/);
-  assert.doesNotMatch(move, /\[├└\]─ SCORE:/);
+  assert.doesNotMatch(move, /\[\s*\]\s*ꜱᴄᴏʀᴇ:/);
   assert.match(move, /<b>🧭 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ<\/b>/);
 }
 
@@ -473,8 +472,8 @@ function testMarketMoveConfidenceOnlyChange(): void {
   );
 
   assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ<\/b>/);
-  assert.match(move, /<b>📊 SCORE: 【 58\/100 】<\/b>/);
-  assert.ok(move.includes("<b>\u2514 STATUS: NOISY / NEUTRAL</b>"));
+  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 58\/100 】<\/b>/);
+  assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɴᴏɪꜱʏ \/ ɴᴇᴜᴛʀᴀʟ</b>"));
   assert.match(
     move,
     /ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ᴄᴏɴꜰɪʀᴍᴇᴅ → ɴᴏɪꜱʏ/
@@ -516,9 +515,9 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(causal.includes("<b>\u251C BTC  +0.3%</b>"));
-  assert.ok(causal.includes("<b>\u251C ETH  +0.5%</b>"));
-  assert.ok(causal.includes("<b>\u2514 SOL  +1.1%</b>"));
+  assert.ok(causal.includes("<b>\u251C ʙᴛᴄ +0.3%</b>"));
+  assert.ok(causal.includes("<b>\u251C ᴇᴛʜ +0.5%</b>"));
+  assert.ok(causal.includes("<b>\u2514 ꜱᴏʟ +1.1%</b>"));
 
   const unavailable = formatRegimeAlert(
     current,
@@ -535,7 +534,7 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(!unavailable.includes("\u{1F310} MAJORS \u2022 LAST SCAN"));
+  assert.ok(!unavailable.includes("\u{1F310} ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ"));
 
   const tooOld = formatRegimeAlert(
     current,
@@ -596,8 +595,29 @@ function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
 }
 function testExistingGenericHeaderFooterAndCapitalizationRemainStable(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
-  assert.deepEqual(formatFooter(), ["\u2501".repeat(22), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"]);
+  assert.deepEqual(formatFooter(), ["\u2501".repeat(20), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"]);
   assert.equal(titleCaseDisplay("btc and sol repair by 09:15 utc during us holiday"), "BTC And SOL Repair By 09:15 UTC During US Holiday");
+}
+
+function testTypographyConsistency(): void {
+  const pulseAlert = pulse(sampleResult(70, "Risk-On"), buildEventContext(new Date("2026-07-03T09:00:00Z")), freshMarketData, majorsInput(), { chopState: "mixed", bestLaneLabel: "SOL leading", ifInAction: "Hold", ifFlatAction: "Wait" } as any);
+
+  const stalePulse = pulse(sampleResult(70, "Risk-On"), buildEventContext(new Date("2026-07-03T09:00:00Z")), staleMarketData, majorsInput(staleMarketData), undefined);
+
+  const move = formatRegimeAlert(
+    sampleResult(65, "Neutral / Chop"),
+    new Date().toISOString(),
+    { score: 65, regime: "Neutral / Chop", label: "Recovery", confidence: "Noisy" } as any,
+    sampleResult(60, "Risk-On"),
+    { chopState: "mixed", bestLaneLabel: "SOL", ifInAction: "Wait", ifFlatAction: "Wait" } as any,
+    buildEventContext(new Date("2026-07-03T09:00:00Z")),
+    freshMarketData,
+    majorsInput()
+  );
+
+  const allOutputs = pulseAlert + stalePulse + move;
+  assert.doesNotMatch(allOutputs, /Unavailable|Degraded|Unknown|Stale|Neutral|Market Data/, "Legacy mixed font words found! Apply smallCapsDisplay to presentation output.");
+  assert.ok(allOutputs.includes("\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07"), "Missing exact heart-on-fire ZWJ header sequence");
 }
 
 testLockedShellRuntimeValuesAndOrder();
@@ -612,6 +632,7 @@ testMarketMoveConfidenceOnlyChange();
 testMarketMoveMajorsAreCausalOrUnavailable();
 testMarketMoveStaleSafetyAndConditionalEventContext();
 testExistingGenericHeaderFooterAndCapitalizationRemainStable();
+testTypographyConsistency();
 
 console.log("Telegram formatter tests passed.");
 
