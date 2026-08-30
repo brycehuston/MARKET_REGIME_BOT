@@ -37,13 +37,13 @@ Generation 2 or a Rust rewrite is not an active objective.
 
 ## Active Task Identity
 
-- Task ID: `AP-7D-RETURNS-01`
+- Task ID: `AP-V102-SEMANTIC-CLEANUP`
 - Checkpoint: `C01`
 - State: `VALIDATED`
 - Repository: `MARKET_REGIME_BOT`
-- Branch: `feat/alpha-pulse-7d-major-returns`
-- Commit: `cc0f63cb3f2c30c79b80d3cebaa3aab60ccb6ae5` (pre-patch)
-- Resume token: `AP-7D-RETURNS-01.C01@cc0f63c`
+- Branch: `feat/alpha-pulse-v102-semantic-cleanup`
+- Commit: `879226f68c1a0ef12b64915c27e7f6aa5c3ad32e` (pre-patch)
+- Resume token: `AP-V102-SEMANTIC-CLEANUP.C01@879226f`
 
 ## Verified Architecture Boundaries
 
@@ -103,13 +103,13 @@ Generation 2 or a Rust rewrite is not an active objective.
 - [x] Implement research-only Liquidity Rotation State Machine V1 telemetry scaffolding.
 - [x] Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
 - [x] Add bounded 7D major-return snapshot telemetry (retBtc7d / retEth7d / retSol7d) on branch `feat/alpha-pulse-7d-major-returns`.
-- [x] Turn the existing always-NO_CLEAR_ROTATION Liquidity Rotation telemetry into the validated confirmed-leadership-takeover shadow classifier and update Alpha Pulse Telegram presentation to the locked v1.02 layouts (Heartbeat, Market Move, Startup).
-- [~] Re-run approved read-only EventContext and lane-forensics analysis only when their documented data gates are met.
+- [x] Turn the existing always-NO_CLEAR_ROTATION Liquidity Rotation telemetry into the validated confirmed-leadership-takeover shadow classifier.
+- [~] Update Alpha Pulse Telegram presentation to the locked v1.02 layouts (Alpha Pulse / Heartbeat, Market Move, distinct context, NO_CLEAR_ROTATION wording fix).
 - [ ] Record the evidence-based Generation 1 closeout decision.
 
 ## Current Action
 
-Re-run approved read-only EventContext and lane-forensics analysis only when their documented data gates are met.
+Update Alpha Pulse Telegram presentation to the locked v1.02 layouts (Alpha Pulse / Heartbeat, Market Move, distinct context, NO_CLEAR_ROTATION wording fix).
 
 ## Validation Evidence
 

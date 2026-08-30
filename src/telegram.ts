@@ -123,7 +123,7 @@ export function formatRegimeAlert(
   const marketContext = dataStale ? "Unavailable" : laneExplainer?.chopState ?? "Unavailable";
 
   const directionSuffix = (previousResult && previousResult.score !== result.score)
-    ? (result.score > previousResult.score ? " \u2197" : " \u2198")
+    ? (result.score > previousResult.score ? " \u2197" : (event.label === "Score Slip" ? " \u2193" : " \u2198"))
     : "";
 
   const scoreDisplay = (previousResult && previousResult.score !== result.score)
@@ -149,35 +149,27 @@ export function formatRegimeAlert(
     `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>`,
     `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
     "",
-    pulseSectionLine("\u{1F3AF}", `Signal: ${event.label}`),
+    `<b>\u2316 ꜱɪɢɴᴀʟ: ${escapeHtml(smallCapsDisplay(event.label))}</b>`,
     pulseTreeLine(
       "\u2514\u2500",
       "Confidence",
       dataStale ? "Degraded \u2014 stale data" : regimeConfidenceLabel(regimeConfidence)
     ),
     "",
-    ...(changedRows.length > 0 ? [
-      pulseSectionLine("\u{1F50D}", "What Changed"),
-      ...formatPulseTreeRows(changedRows),
-      ""
-    ] : []),
     ...(availableMajors.length > 0 ? [
       `<b>\u{1F310} ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ</b>`,
       ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"} ${line}</b>`),
       ""
     ] : []),
-    ...(showAction ? [pulseMainLine("\u{1F9ED}", "Action", currentAction), ""] : []),
-    pulseSectionLine("\u{1F4A1}", "Read"),
+    `<b>\u2727 ʀᴇᴀᴅ</b>`,
     pulseTreeTextLine(readLines.length > 1 ? "\u251C\u2500" : "\u2514\u2500", readLines[0] ?? "Market state changed."),
     ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
     "",
-    pulseSectionLine("\u{1F30A}", "Context"),
+    `<b>\u{1F30A} ᴄᴏɴᴛᴇxᴛ</b>`,
     pulseTreeLine(contextRows.length > 0 ? "\u251C\u2500" : "\u2514\u2500", "Market", marketContext),
-    ...(contextRows.length > 0
-      ? [pulseTreeLine("\u2514\u2500", "Event", contextRows.join(" \u2022 "))]
-      : []),
+    ...groupContextRows(contextRows).map((c, i, arr) => pulseTreeLine(i === arr.length - 1 ? "\u2514\u2500" : "\u251C\u2500", c.label, c.value)),
     "",
-    pulseMainLine("◷", "Next Scan", nextScan),
+    pulseMainLine("\u25F7", "Next Scan", nextScan),
     "",
     ALERT_SEPARATOR,
     FOOTER
@@ -222,22 +214,22 @@ export function formatHeartbeatAlert(
     formatReturnsRow("ᴇᴛʜ", majorsInput?.retEth1h, laneExplainer?.retEth1d, laneExplainer?.retEth7d, false),
     formatReturnsRow("ꜱᴏʟ", majorsInput?.retSol1h, laneExplainer?.retSol1d, laneExplainer?.retSol7d, true),
     "",
-    `<b>\u{1F310} ʙʀᴏᴀᴅ ᴍᴀʀᴋᴇᴛ</b>`,
-    `<b>\u251C ᴛᴏᴛᴀʟ ${formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)}</b>`,
-    `<b>\u2514 ʙᴛᴄ.ᴅ ${formatAlphaPulseDominanceLevel(result.global.btcDominancePct)} \u2022 ꜱᴛᴀʙʟᴇ.ᴅ ${formatAlphaPulseDominanceLevel(result.global.stablecoinDominancePct)}</b>`,
-    "",
-    pulseMainLine("\u{1F30A}", "Market", marketState),
+    `<b>\u{1F30A} ᴍᴀʀᴋᴇᴛ</b>`,
     pulseTreeLine("\u251C\u2500", "Rotation", !liquidityRotation ? "UNAVAILABLE" : (liquidityRotation.rotationState === "ALT_ROTATION_CONFIRMED" ? `${liquidityRotation.rotationFromLane ?? "NONE"} \u2192 ${liquidityRotation.rotationToLane ?? "NONE"}` : (liquidityRotation.rotationState === "NO_CLEAR_ROTATION" ? "NONE" : "UNAVAILABLE"))),
     pulseTreeLine("\u251C\u2500", "State", laneExplainer?.chopState ?? "Unavailable"),
     pulseTreeLine("\u2514\u2500", "Pressure", pressure),
     "",
-    pulseMainLine("\u{1F3AF}", "Plan", plan),
+    `<b>\u{1F3AF} ᴘʟᴀɴ: ${escapeHtml(smallCapsDisplay(plan))}</b>`,
     pulseTreeLine("\u251C\u2500", "Best", laneExplainer?.bestLaneLabel ?? "Unavailable"),
-    pulseTreeLine("\u251C\u2500", "In", (laneExplainer?.ifInAction ?? "Unavailable").replace(/,\s+/g, " • ")),
-    pulseTreeLine("\u2514\u2500", "Flat", (laneExplainer?.ifFlatAction ?? "Unavailable").replace(/,\s+/g, " • ")),
+    pulseTreeLine("\u251C\u2500", "In", (laneExplainer?.ifInAction ?? "Unavailable").replace(/,\s+/g, " \u2022 ")),
+    pulseTreeLine("\u2514\u2500", "Flat", (laneExplainer?.ifFlatAction ?? "Unavailable").replace(/,\s+/g, " \u2022 ")),
     "",
-    ...(contextRows.length > 0 ? [pulseMainLine("\u{1F4CE}", "Context", contextRows.join(" • ")), ""] : []),
-    pulseMainLine("◷", "Next Scan", nextScan),
+    ...(contextRows.length > 0 ? [
+      `<b>\u2727 ᴄᴏɴᴛᴇxᴛ</b>`,
+      ...groupContextRows(contextRows).map((c, i, arr) => pulseTreeLine(i === arr.length - 1 ? "\u2514\u2500" : "\u251C\u2500", c.label, c.value)),
+      ""
+    ] : []),
+    pulseMainLine("\u25F7", "Next Scan", nextScan),
     "",
     ALERT_SEPARATOR,
     FOOTER
@@ -516,7 +508,7 @@ function splitContextRows(summary: string | null | undefined): string[] {
   if (!summary) return [];
 
   const rows = summary
-    .split(" | ")
+    .split(/(?: \| |\s*\+\s*)/)
     .map((part) => part.trim())
     .filter(Boolean)
     .map(compactContextRow)
@@ -554,6 +546,32 @@ function formatContextSection(rows: string[]): string[] {
   }), ""];
 }
 
+function groupContextRows(rows: string[]): Array<{ label: string; value: string }> {
+  const categorized = rows.map(categorizeContextRow);
+  const grouped = new Map<string, string[]>();
+  for (const c of categorized) {
+      if (!grouped.has(c.label)) grouped.set(c.label, []);
+      grouped.get(c.label)!.push(c.value);
+  }
+  const result: Array<{label: string, value: string}> = [];
+  if (grouped.has("Liquidity")) result.push({ label: "Liquidity", value: grouped.get("Liquidity")!.join(" \u2022 ") });
+  if (grouped.has("Event")) result.push({ label: "Event", value: grouped.get("Event")!.join(" \u2022 ") });
+  return result;
+}
+
+function categorizeContextRow(row: string): { label: string; value: string } {
+  const lower = row.toLowerCase();
+  if (lower.includes("liquidity") || lower.includes("tga")) {
+    if (lower === "weekend liquidity") return { label: "Liquidity", value: "Weekend" };
+    if (lower === "holiday liquidity") return { label: "Liquidity", value: "Holiday" };
+    if (lower.includes("year-end liquidity")) return { label: "Liquidity", value: "Year-End" };
+    if (lower.startsWith("net liquidity: ")) return { label: "Liquidity", value: row.replace(/^Net Liquidity:\s*/i, "") };
+    if (lower.startsWith("tga: ")) return { label: "Liquidity", value: row };
+    return { label: "Liquidity", value: row.replace(/\s*liquidity\s*/i, "").trim() || row };
+  }
+  return { label: "Event", value: row };
+}
+
 function compactContextRow(value: string): string {
   const lower = value.toLowerCase();
   if (lower.includes("new moon research")) return lower.includes("expiry") ? "Expiry + New Moon" : "New Moon Research";
@@ -564,6 +582,7 @@ function compactContextRow(value: string): string {
   if (lower === "event stack: holiday today + month-end") return "Month-End Flows";
   if (lower === "event stack: holiday today + expiry") return "Expiry Window";
   if (lower === "event stack: holiday today + expiry + month-end") return "Expiry + Month-End";
+  if (lower === "expiry") return "Expiry Window";
   if (lower.startsWith("event stack:")) {
     return value.replace(/^Event Stack:\s*/i, "").replace(/Holiday Today\s*\+?\s*/i, "").replace(/Research Tag/gi, "Research").trim();
   }
@@ -1377,7 +1396,7 @@ function buildActivityState(
   if (session.isWeekend) return weekendActivityState(sessionPhase, volume, meaningfulChange);
 
   if ((regimeChanged && result.regime === "Strong Risk-On / Rotation") || (leaderChanged && isRotationLeader(result.leader))) {
-    return { state: "rotation active", reason: "regime or leader shifted toward rotation" };
+    return { state: "leadership active", reason: "regime or leader shifted toward rotation" };
   }
 
   if (sessionPhase === "London/NY overlap" && meaningfulChange) {
@@ -1452,9 +1471,9 @@ function buildTapeState(
 
   if (result.regime === "Neutral / Chop") return "choppy / mixed";
   if (result.leader === "BTC-led") return "BTC-led tape";
-  if (result.leader === "ETH-led") return "ETH rotation active";
-  if (result.leader === "SOL-led") return "SOL rotation active";
-  if (result.regime === "Strong Risk-On / Rotation") return "risk-on rotation";
+  if (result.leader === "ETH-led") return "ETH leading";
+  if (result.leader === "SOL-led") return "SOL leading";
+  if (result.regime === "Strong Risk-On / Rotation") return "risk-on pressure";
 
   return "steady tape";
 }

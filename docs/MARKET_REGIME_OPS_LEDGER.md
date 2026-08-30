@@ -214,10 +214,17 @@ Review the Lane Rotation Forensics V1 tool and its three exploratory reports. Do
 
 - **Task**: LIQUIDITY ROTATION SHADOW V1 + ALPHA PULSE v1.02 UX
 - **Action**: Turned the existing always-NO_CLEAR_ROTATION Liquidity Rotation telemetry into the validated confirmed-leadership-takeover shadow classifier and updated Alpha Pulse Telegram presentation to the locked v1.02 layouts.
-- **Result**: Implemented deriving telemetry from laneExplainer and properly formatting the UI, including testing suite updates.
+- **Result**:
+  - Alpha Pulse v1.02 final semantic/visual cleanup
+  - Pulse = current-state dashboard
+  - Market Move = change/event card
+  - NO_CLEAR_ROTATION no longer renders misleading "rotation active" wording
+  - distinct Liquidity / Event context presentation
+  - formatter-only change
+  - no score/lane/Rotation/provider/send/execution behavior changes
+  - not deployed
 - **Validation**:
-  - Build checks passed (
-pm run build).
+  - Build checks passed (`npm run build`).
   - Telegram formatting tests passed.
   - Liquidity rotation evaluator tests passed.
   - 0 TypeScript errors.

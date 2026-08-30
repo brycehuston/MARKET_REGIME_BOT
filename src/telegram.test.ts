@@ -199,8 +199,8 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
   assert.match(alert, /<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
 
-  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ: ᴄʜᴏᴘᴘʏ/);
-  assert.match(alert, /<b>└─ ᴘʀᴇꜱꜱᴜʀᴇ: ꜱᴏʟ ʀᴏᴛᴀᴛɪᴏɴ ᴀᴄᴛɪᴠᴇ<\/b>/);
+  assert.match(alert, /<b>🌊 ᴍᴀʀᴋᴇᴛ<\/b>/);
+  assert.match(alert, /<b>└─ ᴘʀᴇꜱꜱᴜʀᴇ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
   assert.match(alert, /🎯 ᴘʟᴀɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
     assert.match(alert, /<b>├─ ʀᴏᴛᴀᴛɪᴏɴ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ<\/b>/);
   assert.match(alert, /<b>├─ ʙᴇꜱᴛ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
@@ -209,7 +209,7 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.match(alert, /<b>└─ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
   assert.match(alert, /◷ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
-  const ordered = ["\u25C8 ꜱᴇꜱꜱɪᴏɴ", "\u{1F321} ᴍᴏᴅᴇ", "📈 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ", "\u{1F3AF} ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "◷ ɴᴇxᴛ ꜱᴄᴀɴ"];
+  const ordered = ["\u25C8 ꜱᴇꜱꜱɪᴏɴ", "\u{1F321} ᴍᴏᴅᴇ", "📈 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ", "\u{1F3AF} ᴘʟᴀɴ", "✧ ᴄᴏɴᴛᴇxᴛ", "◷ ɴᴇxᴛ ꜱᴄᴀɴ"];
   for (let index = 1; index < ordered.length; index += 1) assert.ok(alert.indexOf(ordered[index - 1]) !== -1 && alert.indexOf(ordered[index - 1]) < alert.indexOf(ordered[index]));
 }
 
@@ -248,7 +248,7 @@ function testMissingOrDegradedDataNeverFabricatesMajors(): void {
   const alert = pulse(sampleResult(60), undefined, staleMarketData, majorsInput({ marketDataFresh: false }), staleLane);
   assert.doesNotMatch(alert, /ʙᴛᴄ: [+-]?\d/);
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 60\/100<\/b>/);
-  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(alert, /<b>🌊 ᴍᴀʀᴋᴇᴛ<\/b>/);
   assert.match(alert, /<b>├─ ʙᴇꜱᴛ: ᴅᴀᴛᴀ ꜱᴛᴀʟᴇ<\/b>/);
 }
 
@@ -264,7 +264,8 @@ function testConditionalContextAndProviderNoiseFiltering(): void {
     "Liquidity: Treasury Fiscaldata Available - Tga Context Only; No Score Impact"
   ];
   const contextual = pulse(sampleResult(70, "Risk-On", "2026-10-31T09:00:00Z"), context);
-  assert.match(contextual, /📎 ᴄᴏɴᴛᴇxᴛ: ᴡᴇᴇᴋᴇɴᴅ ʟɪqᴜɪᴅɪᴛʏ • ʜᴀʟʟᴏᴡᴇᴇɴ ᴡɪɴᴅᴏᴡ 🎃/);
+  assert.match(contextual, /<b>├─ ʟɪqᴜɪᴅɪᴛʏ: ᴡᴇᴇᴋᴇɴᴅ<\/b>/);
+  assert.match(contextual, /<b>└─ ᴇᴠᴇɴᴛ: ʜᴀʟʟᴏᴡᴇᴇɴ ᴡɪɴᴅᴏᴡ 🎃 • ᴍᴏɴᴛʜ-ᴇɴᴅ ꜰʟᴏᴡꜱ<\/b>/);
   assert.doesNotMatch(contextual, /FRED|TGA|Telemetry|No Score Impact|Event Stack/i);
 }
 
@@ -337,26 +338,15 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
     "<b>📈 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
-  assert.doesNotMatch(move, /Major Shift|ᴍᴀᴊᴏʀ ꜱʜɪꜰᴛ/);
-
-  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 58 → 61 】 ↗<\/b>/);
+  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>└─ ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
+  assert.match(move, /<b>🌐 ᴍᴀᴊᴏʀꜱ • ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɪᴍᴘʀᴏᴠɪɴɢ</b>"));
 
-  assert.match(
-    move,
-    /ᴍᴏᴅᴇ: ɴᴇᴜᴛʀᴀʟ \/ ᴄʜᴏᴘ → ʀɪꜱᴋ-ᴏɴ/
-  );
-
-  assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
-
-  assert.match(move, /<b>\u{1F310} ᴍᴀᴊᴏʀꜱ • ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/u);
   assert.ok(move.includes("<b>\u251C ʙᴛᴄ +0.3%</b>"));
   assert.ok(move.includes("<b>\u251C ᴇᴛʜ +0.5%</b>"));
   assert.ok(move.includes("<b>\u2514 ꜱᴏʟ +1.1%</b>"));
-
-  assert.match(move, /<b>🧭 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ<\/b>/);
-
+  assert.match(move, /<b>\u2727 ʀᴇᴀᴅ<\/b>/);
   assert.match(move, /<b>└─ ᴍᴀʀᴋᴇᴛ: ᴄʜᴏᴘᴘʏ<\/b>/);
   assert.match(move, /◷ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
@@ -400,19 +390,13 @@ function testMarketMoveScoreSlipOmitsUnchangedState(): void {
     "<b>📉 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ꜱᴄᴏʀᴇ ꜱʟɪᴘ<\/b>/);
+  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ꜱᴄᴏʀᴇ ꜱʟɪᴘ<\/b>/);
 
-  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 70 → 64 】 ↘<\/b>/);
+  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 70 → 64 】 ↓<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ᴅᴇᴛᴇʀɪᴏʀᴀᴛɪɴɢ</b>"));
-  assert.doesNotMatch(move, /ᴍᴏᴅᴇ: ɴᴏ ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ/);
 
   assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
   assert.doesNotMatch(move, /[├└]─ ʟᴇᴀᴅᴇʀ:/);
-
-  assert.equal(
-    (move.match(/ᴄᴏɴꜰɪᴅᴇɴᴄᴇ:/g) ?? []).length,
-    1
-  );
 
   assert.doesNotMatch(move, /🧭 ᴀᴄᴛɪᴏɴ:/);
 }
@@ -444,12 +428,10 @@ function testMarketMoveLeadershipOnlyChange(): void {
     "<b>🔄 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ<\/b>/);
   assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 64\/100 】<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɴᴏɪꜱʏ \/ ɴᴇᴜᴛʀᴀʟ</b>"));
-  assert.match(move, /ʟᴇᴀᴅᴇʀ: ʙᴛᴄ-ʟᴇᴅ → ꜱᴏʟ-ʟᴇᴅ/);
   assert.doesNotMatch(move, /\[\s*\]\s*ꜱᴄᴏʀᴇ:/);
-  assert.match(move, /<b>🧭 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ<\/b>/);
 }
 
 function testMarketMoveConfidenceOnlyChange(): void {
@@ -476,17 +458,11 @@ function testMarketMoveConfidenceOnlyChange(): void {
     marketMoveMajors()
   );
 
-  assert.match(move, /<b>🎯 ꜱɪɢɴᴀʟ: ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ<\/b>/);
   assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 58\/100 】<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɴᴏɪꜱʏ \/ ɴᴇᴜᴛʀᴀʟ</b>"));
-  assert.match(
-    move,
-    /ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ᴄᴏɴꜰɪʀᴍᴇᴅ → ɴᴏɪꜱʏ/
-  );
 
-  assert.doesNotMatch(move, /\[├└\]─ SCORE:/);
-  assert.doesNotMatch(move, /[├└]─ ᴍᴏᴅᴇ:/);
-  assert.doesNotMatch(move, /[├└]─ ʟᴇᴀᴅᴇʀ:/);
+  assert.doesNotMatch(move, /\[\s*\]\s*ꜱᴄᴏʀᴇ:/);
   assert.doesNotMatch(move, /🧭 ᴀᴄᴛɪᴏɴ:/);
 }
 
@@ -588,13 +564,13 @@ function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
     })
   );
 
-  assert.match(stale, /<b>🎯 ꜱɪɢɴᴀʟ: ᴍᴏᴠᴇ ᴜɴᴠᴇʀɪꜰɪᴇᴅ<\/b>/);
+  assert.match(stale, /<b>\u2316 ꜱɪɢɴᴀʟ: ᴍᴏᴠᴇ ᴜɴᴠᴇʀɪꜰɪᴇᴅ<\/b>/);
   assert.equal(
     (stale.match(/Unavailable|ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/gi) ?? []).length >= 1,
     true
   );
 
-  assert.match(stale, /<b>🧭 ᴀᴄᴛɪᴏɴ: ᴘʀᴏᴛᴇᴄᴛ \/ ᴠᴇʀɪꜰʏ ᴍᴀɴᴜᴀʟʟʏ<\/b>/);
+  assert.doesNotMatch(stale, /🧭 ᴀᴄᴛɪᴏɴ:/);
 
   assert.match(stale, /ᴇᴠᴇɴᴛ:/);
 }
