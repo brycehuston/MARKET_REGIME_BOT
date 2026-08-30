@@ -1,4 +1,4 @@
-﻿import {
+import {
   BestLane,
   ChopState,
   LaneConfidence,
@@ -30,6 +30,15 @@ interface ReturnSet {
   retSolEth1d: number | null;
 }
 
+/** Snapshot-telemetry-only 7D returns. Kept separate from ReturnSet so that
+ *  Object.values(returns) inside deriveBestLane does NOT count these as usable
+ *  return fields, preventing any accidental effect on lane scoring or availability. */
+interface ReturnSet7d {
+  retBtc7d: number | null;
+  retEth7d: number | null;
+  retSol7d: number | null;
+}
+
 interface LaneRankingResult {
   bestLane: BestLane;
   bestLaneLabel: string;
@@ -45,6 +54,7 @@ interface LaneRankingResult {
   leaderPersistenceScans: number | null;
   btcRepairFlag: boolean | null;
   returns: ReturnSet;
+  returns7d: ReturnSet7d;
 }
 
 interface ChopProxyResult {
@@ -91,7 +101,8 @@ export function deriveLaneExplainer(input: LaneExplainerInput): LaneExplainerRes
     suppressionNote: chop.suppressionNote,
     scoreFlipCount6h: chop.scoreFlipCount6h,
     scoreRange6h: chop.scoreRange6h,
-    ...ranking.returns
+    ...ranking.returns,
+    ...ranking.returns7d
   };
 
   if (input.marketDataFresh === false) {
@@ -164,7 +175,8 @@ export function deriveBestLane(input: LaneExplainerInput): LaneRankingResult {
     laneScoreStables: stablesScore,
     leaderPersistenceScans,
     btcRepairFlag,
-    returns
+    returns,
+    returns7d: derive7dReturns(input)
   };
 }
 
@@ -315,6 +327,23 @@ function deriveReturns(input: LaneExplainerInput): ReturnSet {
     retEthBtc1d: roundNullable(pctChange(ethBtcRatio, historicalPointValue(point1d, "historicalEthBtcRatio", "ethBtcRatio"))),
     retSolBtc1d: roundNullable(pctChange(solBtcRatio, historicalPointValue(point1d, "historicalSolBtcRatio", "solBtcRatio"))),
     retSolEth1d: roundNullable(pctChange(solEthRatio, historicalPointValue(point1d, "historicalSolEthRatio", "solEthRatio")))
+  };
+}
+
+/** Derives the snapshot-telemetry-only 7D returns.
+ *  Uses the exact same historicalPointValue/pctChange/roundNullable path as ret*1d.
+ *  The 168H denominator is separate from ReturnSet so it cannot influence
+ *  usableReturnCount, weightedAssetReturn, or any lane/scoring calculation. */
+function derive7dReturns(input: LaneExplainerInput): ReturnSet7d {
+  const currentMs = timestampMs(input.timestamp);
+  const point7d = nearestAtOrBefore(input.history, currentMs, 168);
+  const btcPrice = input.historicalBtcPrice ?? input.btcPrice;
+  const ethPrice = input.historicalEthPrice ?? input.ethPrice;
+  const solPrice = input.historicalSolPrice ?? input.solPrice;
+  return {
+    retBtc7d: roundNullable(pctChange(btcPrice, historicalPointValue(point7d, "historicalBtcPrice", "btcPrice"))),
+    retEth7d: roundNullable(pctChange(ethPrice, historicalPointValue(point7d, "historicalEthPrice", "ethPrice"))),
+    retSol7d: roundNullable(pctChange(solPrice, historicalPointValue(point7d, "historicalSolPrice", "solPrice")))
   };
 }
 
@@ -514,7 +543,8 @@ function unavailableRanking(returns: ReturnSet): LaneRankingResult {
     laneScoreStables: null,
     leaderPersistenceScans: null,
     btcRepairFlag: null,
-    returns
+    returns,
+    returns7d: { retBtc7d: null, retEth7d: null, retSol7d: null }
   };
 }
 

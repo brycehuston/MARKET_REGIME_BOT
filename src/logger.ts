@@ -120,7 +120,17 @@ export function loadLaneExplainerHistory(config: BotConfig): LaneExplainerHistor
 
   const byTimestamp = new Map<string, LaneExplainerHistoryPoint>();
   for (const point of points) byTimestamp.set(point.timestamp, point);
-  return [...byTimestamp.values()].sort((a, b) => a.timestampMs - b.timestampMs).slice(-500);
+  const sorted = [...byTimestamp.values()].sort((a, b) => a.timestampMs - b.timestampMs);
+
+  // Retain a time window sufficient for a valid ~168H (7D) observation.
+  // 168H + 4 normal 15-minute scan intervals = 169H.  The elapsed-time window
+  // is the sole retention guarantee; no secondary row-count cap is applied so
+  // that a dense manual-scan period cannot truncate the 168H denominator.
+  const RETENTION_MS = 169 * 60 * 60 * 1000; // 169 hours
+  if (sorted.length === 0) return sorted;
+  const newestMs = sorted[sorted.length - 1].timestampMs;
+  const cutoffMs = newestMs - RETENTION_MS;
+  return sorted.filter((p) => p.timestampMs >= cutoffMs);
 }
 
 function normalizeLaneHistoryPoint(raw: Record<string, unknown>): LaneExplainerHistoryPoint | null {

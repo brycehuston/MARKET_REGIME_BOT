@@ -87,7 +87,10 @@ const laneExplainer: LaneExplainerResult = {
   retSolEth4h: null,
   retEthBtc1d: null,
   retSolBtc1d: null,
-  retSolEth1d: null
+  retSolEth1d: null,
+  retBtc7d: null,
+  retEth7d: null,
+  retSol7d: null
 };
 
 const freshMarketData: MarketDataFreshnessFields = {

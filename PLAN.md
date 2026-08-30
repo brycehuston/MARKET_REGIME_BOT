@@ -37,13 +37,13 @@ Generation 2 or a Rust rewrite is not an active objective.
 
 ## Active Task Identity
 
-- Task ID: `AP-LR1-EVAL-01`
-- Checkpoint: `C02`
-- State: `VERIFIED`
-- Repository: `MARKET-REGIME-BOT`
-- Branch: `main`
-- Commit: `94ebe1c`
-- Resume token: `AP-LR1-EVAL-01.C02@94ebe1c`
+- Task ID: `AP-7D-RETURNS-01`
+- Checkpoint: `C01`
+- State: `VALIDATED`
+- Repository: `MARKET_REGIME_BOT`
+- Branch: `feat/alpha-pulse-7d-major-returns`
+- Commit: `cc0f63cb3f2c30c79b80d3cebaa3aab60ccb6ae5` (pre-patch)
+- Resume token: `AP-7D-RETURNS-01.C01@cc0f63c`
 
 ## Verified Architecture Boundaries
 
@@ -102,6 +102,7 @@ Generation 2 or a Rust rewrite is not an active objective.
 - [x] Assess current explicit-fresh snapshot sufficiency for Liquidity Rotation State Machine V1 research telemetry.
 - [x] Implement research-only Liquidity Rotation State Machine V1 telemetry scaffolding.
 - [x] Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
+- [x] Add bounded 7D major-return snapshot telemetry (retBtc7d / retEth7d / retSol7d) on branch `feat/alpha-pulse-7d-major-returns`. History retention upgraded from 500-row slice to 169H time window. Focused tests A-F passed. Build passed. No provider, score, lane, or Telegram change.
 - [~] Continue research-only forward-shadow snapshot collection until the untouched holdout contains at least 10 mature candidate outcomes and two `ALT_ROTATION_CONFIRMED` observations, then rerun the evaluator without retuning development rules.
 - [ ] Re-run approved read-only EventContext and lane-forensics analysis only when their documented data gates are met.
 - [ ] Record the evidence-based Generation 1 closeout decision.

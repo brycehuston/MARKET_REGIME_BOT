@@ -85,6 +85,9 @@ const laneExplainer: LaneExplainerResult = {
   retEthBtc1d: null,
   retSolBtc1d: null,
   retSolEth1d: null,
+  retBtc7d: null,
+  retEth7d: null,
+  retSol7d: null,
 };
 
 const majorsInput: AlphaPulseMajorsInput = {

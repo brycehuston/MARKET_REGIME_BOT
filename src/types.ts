@@ -512,6 +512,9 @@ export interface LaneExplainerSnapshotFields {
   retBtc1d: number | null;
   retEth1d: number | null;
   retSol1d: number | null;
+  retBtc7d: number | null;
+  retEth7d: number | null;
+  retSol7d: number | null;
   retEthBtc4h: number | null;
   retSolBtc4h: number | null;
   retSolEth4h: number | null;
