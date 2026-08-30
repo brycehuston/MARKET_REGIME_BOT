@@ -162,7 +162,8 @@ function normalizeLaneHistoryPoint(raw: Record<string, unknown>): LaneExplainerH
     bestLane: typeof raw.bestLane === "string" ? raw.bestLane : null,
     btcDominancePct: finiteNumber((raw.global as Record<string, unknown> | undefined)?.btcDominancePct),
     marketDataFresh: typeof raw.marketDataFresh === "boolean" ? raw.marketDataFresh : null,
-    rotationState: isLiquidityRotationState(raw.rotationState) ? raw.rotationState : null
+    rotationState: isLiquidityRotationState(raw.rotationState) ? raw.rotationState : null,
+    laneMargin: finiteNumber(raw.laneMargin)
   };
 }
 

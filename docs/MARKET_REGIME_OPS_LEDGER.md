@@ -209,3 +209,15 @@ Progress Rules:
 ## Next Exact Action
 
 Review the Lane Rotation Forensics V1 tool and its three exploratory reports. Do not commit or deploy without explicit approval. Continue collecting explicit-fresh snapshots, then re-run `npm run lane:forensics` after at least 100 valid rows before selecting a candidate threshold or implementing Phase 2.
+
+## 2026-08-30: Liquidity Rotation Shadow V1 + Alpha Pulse v1.02 UX
+
+- **Task**: LIQUIDITY ROTATION SHADOW V1 + ALPHA PULSE v1.02 UX
+- **Action**: Turned the existing always-NO_CLEAR_ROTATION Liquidity Rotation telemetry into the validated confirmed-leadership-takeover shadow classifier and updated Alpha Pulse Telegram presentation to the locked v1.02 layouts.
+- **Result**: Implemented deriving telemetry from laneExplainer and properly formatting the UI, including testing suite updates.
+- **Validation**:
+  - Build checks passed (
+pm run build).
+  - Telegram formatting tests passed.
+  - Liquidity rotation evaluator tests passed.
+  - 0 TypeScript errors.

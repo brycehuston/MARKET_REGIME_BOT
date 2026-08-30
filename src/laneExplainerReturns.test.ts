@@ -54,6 +54,7 @@ function makeHistoryPoint(hoursBack: number, btc: number, eth: number, sol: numb
     historicalSolBtcRatio: sol / btc,
     historicalSolEthRatio: sol / eth,
     bestLane: "BTC",
+    laneMargin: null
   };
 }
 

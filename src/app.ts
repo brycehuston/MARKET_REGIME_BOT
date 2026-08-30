@@ -160,15 +160,6 @@ export class MarketRegimeBot {
       accuracyFields.retBtc1h = _majors1h.btcReturnPct;
       accuracyFields.retEth1h = _majors1h.ethReturnPct;
       accuracyFields.retSol1h = _majors1h.solReturnPct;
-      const liquidityRotationTelemetry = deriveLiquidityRotationTelemetry({
-        timestamp: result.timestamp,
-        global: result.global,
-        freshness,
-        ethBtcRatio: accuracyFields.ethBtcRatio,
-        solBtcRatio: accuracyFields.solBtcRatio,
-        solEthRatio: accuracyFields.solEthRatio,
-        history: laneHistory
-      });
       const laneExplainer = deriveLaneExplainer({
         timestamp: result.timestamp,
         score: result.score,
@@ -194,6 +185,18 @@ export class MarketRegimeBot {
         marketDataFresh: freshness.marketDataFresh,
         marketDataStaleReason: freshness.marketDataStaleReason,
         history: laneHistory
+      });
+
+      const liquidityRotationTelemetry = deriveLiquidityRotationTelemetry({
+        timestamp: result.timestamp,
+        global: snapshot.global,
+        freshness,
+        ethBtcRatio: accuracyFields.ethBtcRatio,
+        solBtcRatio: accuracyFields.solBtcRatio,
+        solEthRatio: accuracyFields.solEthRatio,
+        history: laneHistory,
+        currentLaneMargin: laneExplainer.laneMargin ?? null,
+        currentBestLane: laneExplainer.bestLane
       });
 
       logScore(this.config, result);
@@ -223,8 +226,8 @@ export class MarketRegimeBot {
             retBtc1h: _majors1h.btcReturnPct,
             retEth1h: _majors1h.ethReturnPct,
             retSol1h: _majors1h.solReturnPct,
-            history: laneHistory
-          }));
+              history: laneHistory
+            }, liquidityRotationTelemetry));
             telegramSent = true;
           } catch (error) {
             // Alert delivery should not stop the bot from saving state/logs.
@@ -249,8 +252,8 @@ export class MarketRegimeBot {
             retBtc1h: _majors1h.btcReturnPct,
             retEth1h: _majors1h.ethReturnPct,
             retSol1h: _majors1h.solReturnPct,
-            history: laneHistory
-          }));
+              history: laneHistory
+            }, liquidityRotationTelemetry));
           heartbeatSent = true;
         } catch (error) {
           // Heartbeat delivery should not stop the bot from saving state/logs.

@@ -1,9 +1,9 @@
 import { formatEventContextSummary } from "./eventContext";
-import { ActionGuidance, EventContext, LaneExplainerHistoryPoint, LaneExplainerResult, LeaderName, MarketDataFreshnessFields, RegimeConfidence, RegimeScoreResult } from "./types";
+import { ActionGuidance, EventContext, LaneExplainerHistoryPoint, LaneExplainerResult, LeaderName, LiquidityRotationTelemetry, MarketDataFreshnessFields, RegimeConfidence, RegimeScoreResult } from "./types";
 
 const ALERT_SEPARATOR = "\u2501".repeat(20);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
-const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01";
+const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.02";
 const ALPHA_PULSE_HEADER = "\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07";
 const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD", "FRED", "TGA", "NY"]);
 export interface TempoTapeContext {
@@ -81,7 +81,8 @@ export function formatRegimeAlert(
   laneExplainer?: LaneExplainerResult,
   eventContext?: EventContext,
   marketData?: MarketDataFreshnessFields,
-  majorsInput?: AlphaPulseMajorsInput
+  majorsInput?: AlphaPulseMajorsInput,
+  liquidityRotation?: LiquidityRotationTelemetry
 ): string {
   const dataStale = marketData?.marketDataFresh === false;
   const guidance = getActionGuidance(result);
@@ -119,10 +120,7 @@ export function formatRegimeAlert(
       ? buildExplainerMoveReadLines(result, laneExplainer).slice(0, 2)
       : buildMoveReadLines(result, guidance).slice(0, 2);
 
-  const marketContext = [
-    dataStale ? "Unavailable" : laneExplainer?.chopState ?? "Unavailable",
-    tempoContext.sessionPhase
-  ].join(" \u2022 ");
+  const marketContext = dataStale ? "Unavailable" : laneExplainer?.chopState ?? "Unavailable";
 
   const directionSuffix = (previousResult && previousResult.score !== result.score)
     ? (result.score > previousResult.score ? " \u2197" : " \u2198")
@@ -145,6 +143,8 @@ export function formatRegimeAlert(
     ALERT_SEPARATOR,
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
+    "",
+    `<b>${formatSessionIcon(tempoContext.sessionPhase)} ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
     "",
     `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>`,
     `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
@@ -177,7 +177,7 @@ export function formatRegimeAlert(
       ? [pulseTreeLine("\u2514\u2500", "Event", contextRows.join(" \u2022 "))]
       : []),
     "",
-    pulseMainLine("\u23F1\uFE0F", "Next Scan", nextScan),
+    pulseMainLine("◷", "Next Scan", nextScan),
     "",
     ALERT_SEPARATOR,
     FOOTER
@@ -192,7 +192,8 @@ export function formatHeartbeatAlert(
   laneExplainer?: LaneExplainerResult,
   eventContext?: EventContext,
   marketData?: MarketDataFreshnessFields,
-  majorsInput?: AlphaPulseMajorsInput
+  majorsInput?: AlphaPulseMajorsInput,
+  liquidityRotation?: LiquidityRotationTelemetry
 ): string {
   const dataStale = marketData?.marketDataFresh === false;
   const guidance = getActionGuidance(result);
@@ -210,30 +211,33 @@ export function formatHeartbeatAlert(
     `<b>${ALPHA_PULSE_HEADER}</b>`,
     ALERT_SEPARATOR,
     "",
+    `<b>${formatSessionIcon(tempoContext.sessionPhase)} ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
+    "",
     `<b>\u{1F321} ᴍᴏᴅᴇ: ${smallCapsDisplay(result.regime)}</b>`,
     `<b>\u251C ꜱᴄᴏʀᴇ: ${result.score}/100</b>`,
     `<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ${smallCapsDisplay(regimeConfidenceLabel(regimeConfidence))}</b>`,
     "",
-    `<b>\u{1F4C8} ᴍᴀᴊᴏʀꜱ</b>`,
-    `<b>\u251C ʙᴛᴄ: ${formatAlphaPulseMajor(majorsInput?.btcPrice, majorsInput?.retBtc1h, null, null)}</b>`,
-    `<b>\u251C ᴇᴛʜ: ${formatAlphaPulseMajor(majorsInput?.ethPrice, majorsInput?.retEth1h, null, null)}</b>`,
-    `<b>\u2514 ꜱᴏʟ: ${formatAlphaPulseMajor(majorsInput?.solPrice, majorsInput?.retSol1h, null, null)}</b>`,
+    `<b>📈 ᴍᴀᴊᴏʀꜱ 1ʜ • 24ʜ • 7ᴅ</b>`,
+    formatReturnsRow("ʙᴛᴄ", majorsInput?.retBtc1h, laneExplainer?.retBtc1d, laneExplainer?.retBtc7d, false),
+    formatReturnsRow("ᴇᴛʜ", majorsInput?.retEth1h, laneExplainer?.retEth1d, laneExplainer?.retEth7d, false),
+    formatReturnsRow("ꜱᴏʟ", majorsInput?.retSol1h, laneExplainer?.retSol1d, laneExplainer?.retSol7d, true),
     "",
     `<b>\u{1F310} ʙʀᴏᴀᴅ ᴍᴀʀᴋᴇᴛ</b>`,
     `<b>\u251C ᴛᴏᴛᴀʟ ${formatAlphaPulseMajor(result.global.totalMarketCapUsd, null, null, result.global.totalMarketCapChange24hPct)}</b>`,
     `<b>\u2514 ʙᴛᴄ.ᴅ ${formatAlphaPulseDominanceLevel(result.global.btcDominancePct)} \u2022 ꜱᴛᴀʙʟᴇ.ᴅ ${formatAlphaPulseDominanceLevel(result.global.stablecoinDominancePct)}</b>`,
     "",
-    pulseMainLine("\u{1F30A}", "Market State", marketState),
-    pulseTreeLine("\u251C\u2500", "Session", tempoContext.sessionPhase),
+    pulseMainLine("\u{1F30A}", "Market", marketState),
+    pulseTreeLine("\u251C\u2500", "Rotation", !liquidityRotation ? "UNAVAILABLE" : (liquidityRotation.rotationState === "ALT_ROTATION_CONFIRMED" ? `${liquidityRotation.rotationFromLane ?? "NONE"} \u2192 ${liquidityRotation.rotationToLane ?? "NONE"}` : (liquidityRotation.rotationState === "NO_CLEAR_ROTATION" ? "NONE" : "UNAVAILABLE"))),
+    pulseTreeLine("\u251C\u2500", "State", laneExplainer?.chopState ?? "Unavailable"),
     pulseTreeLine("\u2514\u2500", "Pressure", pressure),
     "",
     pulseMainLine("\u{1F3AF}", "Plan", plan),
-    pulseTreeLine("\u251C\u2500", "Best Lane", laneExplainer?.bestLaneLabel ?? "Unavailable"),
-    pulseTreeLine("\u251C\u2500", "If In", (laneExplainer?.ifInAction ?? "Unavailable").replace(/,\s+/g, " • ")),
-    pulseTreeLine("\u2514\u2500", "If Flat", (laneExplainer?.ifFlatAction ?? "Unavailable").replace(/,\s+/g, " • ")),
+    pulseTreeLine("\u251C\u2500", "Best", laneExplainer?.bestLaneLabel ?? "Unavailable"),
+    pulseTreeLine("\u251C\u2500", "In", (laneExplainer?.ifInAction ?? "Unavailable").replace(/,\s+/g, " • ")),
+    pulseTreeLine("\u2514\u2500", "Flat", (laneExplainer?.ifFlatAction ?? "Unavailable").replace(/,\s+/g, " • ")),
     "",
     ...(contextRows.length > 0 ? [pulseMainLine("\u{1F4CE}", "Context", contextRows.join(" • ")), ""] : []),
-    pulseMainLine("\u23F1\uFE0F", "Next Scan", nextScan),
+    pulseMainLine("◷", "Next Scan", nextScan),
     "",
     ALERT_SEPARATOR,
     FOOTER
@@ -907,7 +911,6 @@ function buildPulseActivitySection(
   laneExplainer?: LaneExplainerResult
 ): string[] {
   const lines = [treeHeaderLine("\u{1F30A}", "Activity", marketActivity ?? sentenceCase(tempoContext.activityState))];
-  lines.push(treeLine("\u251C\u2500", "Session", formatSessionLine(tempoContext)));
   if (laneExplainer) {
     lines.push(treeLine("\u2514\u2500", "Invalid If", laneExplainer.invalidIf));
   } else {
@@ -1893,6 +1896,24 @@ function mixedWatch(): string[] {
 
 
 
+
+function formatSessionIcon(phase: string): string {
+  if (phase.includes("overlap") || phase.includes("\u00D7") || phase.includes("x")) return "\u26A1";
+  if (phase.toLowerCase().includes("weekend") || phase.toLowerCase().includes("late") || phase.toLowerCase().includes("off")) return "\u25CC";
+  return "\u25C8";
+}
+
+function formatReturnsRow(name: string, ret1h?: number | null, ret1d?: number | null, ret7d?: number | null, isLast = false): string {
+  const h1 = (ret1h != null && Number.isFinite(ret1h)) ? formatAlphaPulseMajorReturn(ret1h) : smallCapsDisplay("Unav");
+  const d1 = (ret1d != null && Number.isFinite(ret1d)) ? formatAlphaPulseMajorReturn(ret1d) : smallCapsDisplay("Unav");
+  const d7 = (ret7d != null && Number.isFinite(ret7d)) ? formatAlphaPulseMajorReturn(ret7d) : smallCapsDisplay("Unav");
+
+  const h1Pad = h1.padEnd(5, ' ');
+  const d1Pad = d1.padEnd(5, ' ');
+
+  const prefix = isLast ? "\u2514" : "\u251C";
+  return `<b>${prefix} ${name}  ${h1Pad} \u2502 ${d1Pad} \u2502 ${d7}</b>`;
+}
 export function formatAlphaPulseMajor(price: number | null | undefined, ret1h: number | null | undefined, ret4h: number | null | undefined, ret1d: number | null | undefined): string {
   if (price == null || !Number.isFinite(price)) return smallCapsDisplay("Unavailable");
   let pStr = `$${price.toFixed(2)}`;
@@ -1921,19 +1942,19 @@ export function formatAlphaPulseDominanceLevel(value: number | null | undefined)
 export function formatStartupAlert(scanIntervalMinutes: number): string {
   const nextScan = `~${scanIntervalMinutes}\u1D0D`;
   return [
-    "<b>─────────────</b>",
-    "<b>ᴀʟᴘʜᴀ ᴘᴜʟꜱᴇ │</b> ᴏɴʟɪɴᴇ <b>◉</b>",
-    "<b>────────────╮</b>",
-    " <b>≋ ᴘᴜʟꜱᴇ ꜱᴇɴꜱᴏʀꜱ</b>:",
-    "<b>├─ ʀᴇɢɪᴍᴇ</b>",
-    "<b>├─ ᴅᴇʀɪᴠᴀᴛɪᴠᴇꜱ</b>",
-    "<b>└─ ʀɪꜱᴋ</b>",
+    "<b>──────────────</b>",
+    " <b>\u25C9 ᴀʟᴘʜᴀ \u2502 ᴘᴜʟꜱᴇ</b>",
+    " <b>\u2514\u2500 ᴏɴʟɪɴᴇ ──────\u256F</b>",
     "",
-    `<b>◷ ɴᴇxᴛ ꜱᴄᴀɴ │</b> ${nextScan}`,
-    "<b>─────────────</b>",
-    "ᴘᴜʟꜱᴇ <b>©</b> ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ <b>|</b> v1.01",
-    "╰<b>───────</b>╯"
+    "<b>\u224B ᴘᴜʟꜱᴇ ꜱᴇɴꜱᴏʀꜱ</b>",
+    "<b>\u251C ʀᴇɢɪᴍᴇ</b>",
+    "<b>\u251C ʀᴏᴛᴀᴛɪᴏɴ</b>",
+    "<b>\u251C ᴅᴇʀɪᴠᴀᴛɪᴠᴇꜱ</b>",
+    "<b>\u2514 ʀɪꜱᴋ</b>",
+    "",
+    `<b>\u25F7 ɴᴇxᴛ \u2502</b> ${nextScan}`,
+    "<b>─────────────\u256E</b>",
+    "ᴘᴜʟꜱᴇ <b>\u00A9</b> ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ",
+    "<b>\u2502</b> v1.02"
   ].join("\n");
 }
-
-

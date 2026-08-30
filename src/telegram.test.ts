@@ -79,18 +79,18 @@ const laneExplainer: LaneExplainerResult = {
   retBtc12h: null,
   retEth12h: null,
   retSol12h: null,
-  retBtc1d: null,
-  retEth1d: null,
-  retSol1d: null,
+  retBtc1d: 2.1,
+  retEth1d: 3.8,
+  retSol1d: 5.1,
   retEthBtc4h: null,
   retSolBtc4h: null,
   retSolEth4h: null,
   retEthBtc1d: null,
   retSolBtc1d: null,
   retSolEth1d: null,
-  retBtc7d: null,
-  retEth7d: null,
-  retSol7d: null
+  retBtc7d: 6.4,
+  retEth7d: 9.7,
+  retSol7d: 14.2
 };
 
 const freshMarketData: MarketDataFreshnessFields = {
@@ -147,7 +147,8 @@ function historyPoint(timestamp: string, btcPrice: number | null, ethPrice: numb
     solEthRatio: null,
     livePriceTimestamp: timestamp,
     bestLane: "SOL",
-    marketDataFresh: fresh
+    marketDataFresh: fresh,
+    laneMargin: null
   };
 }
 
@@ -191,23 +192,24 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.equal(lines[0], "\u2501".repeat(20));
   assert.equal(lines[1], "<b>\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07</b>");
   assert.equal(lines[2], "\u2501".repeat(20));
-  assert.deepEqual(lines.slice(-2), ["\u2501".repeat(20), "ᴘᴜʟꜱᴇ © ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ | v1.01"]);
+  assert.deepEqual(lines.slice(-2), ["\u2501".repeat(20), "ᴘᴜʟꜱᴇ © ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ | v1.02"]);
 
+    assert.match(alert, /<b>\u25C8 ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
   assert.match(alert, /<b>\u{1F321} ᴍᴏᴅᴇ: ʀɪꜱᴋ-ᴏɴ<\/b>/u);
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
   assert.match(alert, /<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
 
-  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴄʜᴏᴘᴘʏ/);
-  assert.match(alert, /<b>├─ ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
+  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ: ᴄʜᴏᴘᴘʏ/);
   assert.match(alert, /<b>└─ ᴘʀᴇꜱꜱᴜʀᴇ: ꜱᴏʟ ʀᴏᴛᴀᴛɪᴏɴ ᴀᴄᴛɪᴠᴇ<\/b>/);
   assert.match(alert, /🎯 ᴘʟᴀɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ/);
-  assert.match(alert, /<b>├─ ʙᴇꜱᴛ ʟᴀɴᴇ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
-  assert.match(alert, /<b>├─ ɪꜰ ɪɴ: ᴛʀᴀɪʟ • ᴅᴏɴ&#39;ᴛ ᴄʜᴀꜱᴇ<\/b>/);
+    assert.match(alert, /<b>├─ ʀᴏᴛᴀᴛɪᴏɴ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ<\/b>/);
+  assert.match(alert, /<b>├─ ʙᴇꜱᴛ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
+  assert.match(alert, /<b>├─ ɪɴ: ᴛʀᴀɪʟ • ᴅᴏɴ&#39;ᴛ ᴄʜᴀꜱᴇ<\/b>/);
   console.log(alert);
-  assert.match(alert, /<b>└─ ɪꜰ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
-  assert.match(alert, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
+  assert.match(alert, /<b>└─ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
+  assert.match(alert, /◷ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
-  const ordered = ["\u{1F321} ᴍᴏᴅᴇ", "\u{1F4C8} ᴍᴀᴊᴏʀꜱ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ", "\u{1F3AF} ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "\u23F1\uFE0F ɴᴇxᴛ ꜱᴄᴀɴ"];
+  const ordered = ["\u25C8 ꜱᴇꜱꜱɪᴏɴ", "\u{1F321} ᴍᴏᴅᴇ", "📈 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ", "\u{1F3AF} ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "◷ ɴᴇxᴛ ꜱᴄᴀɴ"];
   for (let index = 1; index < ordered.length; index += 1) assert.ok(alert.indexOf(ordered[index - 1]) !== -1 && alert.indexOf(ordered[index - 1]) < alert.indexOf(ordered[index]));
 }
 
@@ -219,9 +221,9 @@ function testCausalMajorsAndFormatting(): void {
   assert.equal(derived.solReturnPct, 0);
 
   const alert = pulse();
-  assert.ok(alert.includes("<b>\u251C ʙᴛᴄ: $60.6K \u2022 1\u029C +1.0%</b>"));
-  assert.ok(alert.includes("<b>\u251C ᴇᴛʜ: $2.0K \u2022 1\u029C -1.0%</b>"));
-  assert.ok(alert.includes("<b>\u2514 ꜱᴏʟ: $100.00 \u2022 1\u029C 0.0%</b>"));
+  assert.ok(alert.includes("<b>\u251C ʙᴛᴄ  +1.0% │ +2.1% │ +6.4%</b>"));
+  assert.ok(alert.includes("<b>\u251C ᴇᴛʜ  -1.0% │ +3.8% │ +9.7%</b>"));
+  assert.ok(alert.includes("<b>\u2514 ꜱᴏʟ  0.0%  │ +5.1% │ +14.2%</b>"));
 
   const futureOnly = majorsInput({ history: [historyPoint("2026-07-03T08:01:00Z", 60_000, 2_000, 100)] });
   assert.deepEqual(deriveAlphaPulseMajors1h(futureOnly), { observedAt: null, btcReturnPct: null, ethReturnPct: null, solReturnPct: null });
@@ -246,8 +248,8 @@ function testMissingOrDegradedDataNeverFabricatesMajors(): void {
   const alert = pulse(sampleResult(60), undefined, staleMarketData, majorsInput({ marketDataFresh: false }), staleLane);
   assert.doesNotMatch(alert, /ʙᴛᴄ: [+-]?\d/);
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 60\/100<\/b>/);
-  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ ꜱᴛᴀᴛᴇ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
-  assert.match(alert, /<b>├─ ʙᴇꜱᴛ ʟᴀɴᴇ: ᴅᴀᴛᴀ ꜱᴛᴀʟᴇ<\/b>/);
+  assert.match(alert, /🌊 ᴍᴀʀᴋᴇᴛ: ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/);
+  assert.match(alert, /<b>├─ ʙᴇꜱᴛ: ᴅᴀᴛᴀ ꜱᴛᴀʟᴇ<\/b>/);
 }
 
 function testConditionalContextAndProviderNoiseFiltering(): void {
@@ -355,12 +357,12 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
 
   assert.match(move, /<b>🧭 ᴀᴄᴛɪᴏɴ: ꜱᴏʟ ꜰᴀᴠᴏʀᴇᴅ<\/b>/);
 
-  assert.match(move, /<b>└─ ᴍᴀʀᴋᴇᴛ: ᴄʜᴏᴘᴘʏ • ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
-  assert.match(move, /⏱️ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
+  assert.match(move, /<b>└─ ᴍᴀʀᴋᴇᴛ: ᴄʜᴏᴘᴘʏ<\/b>/);
+  assert.match(move, /◷ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
   assert.equal(
     move.split("\n").at(-1),
-    "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"
+    "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.02"
   );
 
   assert.equal(
@@ -598,7 +600,7 @@ function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
 }
 function testExistingGenericHeaderFooterAndCapitalizationRemainStable(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
-  assert.deepEqual(formatFooter(), ["\u2501".repeat(20), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.01"]);
+  assert.deepEqual(formatFooter(), ["\u2501".repeat(20), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.02"]);
   assert.equal(titleCaseDisplay("btc and sol repair by 09:15 utc during us holiday"), "BTC And SOL Repair By 09:15 UTC During US Holiday");
 }
 

@@ -568,7 +568,8 @@ function currentPoint(input: LaneExplainerInput): LaneExplainerHistoryPoint {
     historicalSolPrice: input.historicalSolPrice,
     historicalEthBtcRatio: input.historicalEthBtcRatio,
     historicalSolBtcRatio: input.historicalSolBtcRatio,
-    historicalSolEthRatio: input.historicalSolEthRatio
+    historicalSolEthRatio: input.historicalSolEthRatio,
+    laneMargin: null
   };
 }
 

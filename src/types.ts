@@ -403,6 +403,10 @@ export interface LiquidityRotationTelemetry {
   rotationDataQuality: RotationDataQuality;
   rotationSchemaVersion: "liquidity-rotation-v1";
   rotationAuthoritative: false;
+  rotationFromLane: BestLane | null;
+  rotationToLane: BestLane | null;
+  rotationTriggerMargin: number | null;
+  rotationRuleVersion: string;
 }
 
 export interface AccuracySnapshotFields extends MarketDataFreshnessFields {
@@ -477,6 +481,7 @@ export interface LaneExplainerHistoryPoint {
   btcDominancePct?: number | null;
   marketDataFresh?: boolean | null;
   rotationState?: LiquidityRotationState | null;
+  laneMargin: number | null;
 }
 
 export interface LaneExplainerSnapshotFields {

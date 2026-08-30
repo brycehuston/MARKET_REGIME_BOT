@@ -85,6 +85,7 @@ function historyPoint(at: string, overrides: Partial<LaneExplainerHistoryPoint> 
     btcDominancePct: 57,
     marketDataFresh: true,
     rotationState: "NO_CLEAR_ROTATION",
+    laneMargin: null,
     ...overrides
   };
 }
@@ -98,6 +99,8 @@ function derive(overrides: Partial<Parameters<typeof deriveLiquidityRotationTele
     solBtcRatio: 0.0016,
     solEthRatio: 0.051,
     history: [historyPoint("2026-07-22T11:45:00.000Z")],
+      currentLaneMargin: null,
+      currentBestLane: null,
     ...overrides
   });
 }

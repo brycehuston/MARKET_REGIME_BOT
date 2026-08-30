@@ -50,7 +50,8 @@ function historyPoint(input: {
     historicalEthBtcRatio: historicalEthPrice / historicalBtcPrice,
     historicalSolBtcRatio: historicalSolPrice / historicalBtcPrice,
     historicalSolEthRatio: historicalSolPrice / historicalEthPrice,
-    bestLane: "NO_CLEAR_LANE"
+    bestLane: "NO_CLEAR_LANE",
+    laneMargin: null
   };
 }
 
