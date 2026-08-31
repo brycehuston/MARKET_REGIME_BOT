@@ -134,9 +134,9 @@ export function formatRegimeAlert(
 
   const availableMajors: string[] = [];
   if (!dataStale) {
-    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`ʙᴛᴄ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
-    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`ᴇᴛʜ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
-    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱᴏʟ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
+    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`ʙᴛᴄ  $${formatAlphaPulsePrice(majorsInput?.btcPrice ?? null)} \u2022 ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
+    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`ᴇᴛʜ  $${formatAlphaPulsePrice(majorsInput?.ethPrice ?? null)} \u2022 ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
+    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱᴏʟ  $${formatAlphaPulsePrice(majorsInput?.solPrice ?? null)} \u2022 ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
   }
 
   const lines = [
@@ -144,7 +144,7 @@ export function formatRegimeAlert(
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    `<b>${formatSessionIcon(tempoContext.sessionPhase)} ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
+    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
     "",
     `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>`,
     `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
@@ -203,13 +203,13 @@ export function formatHeartbeatAlert(
     `<b>${ALPHA_PULSE_HEADER}</b>`,
     ALERT_SEPARATOR,
     "",
-    `<b>${formatSessionIcon(tempoContext.sessionPhase)} ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
+    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
     "",
     `<b>\u{1F321} ᴍᴏᴅᴇ: ${smallCapsDisplay(result.regime)}</b>`,
     `<b>\u251C ꜱᴄᴏʀᴇ: ${result.score}/100</b>`,
     `<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ${smallCapsDisplay(regimeConfidenceLabel(regimeConfidence))}</b>`,
     "",
-    `<b>📈 ᴍᴀᴊᴏʀꜱ 1ʜ • 24ʜ • 7ᴅ</b>`,
+    `<b>\u2261 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ</b>`,
     formatReturnsRow("ʙᴛᴄ", majorsInput?.retBtc1h, laneExplainer?.retBtc1d, laneExplainer?.retBtc7d, false),
     formatReturnsRow("ᴇᴛʜ", majorsInput?.retEth1h, laneExplainer?.retEth1d, laneExplainer?.retEth7d, false),
     formatReturnsRow("ꜱᴏʟ", majorsInput?.retSol1h, laneExplainer?.retSol1d, laneExplainer?.retSol7d, true),
@@ -219,13 +219,13 @@ export function formatHeartbeatAlert(
     pulseTreeLine("\u251C\u2500", "State", laneExplainer?.chopState ?? "Unavailable"),
     pulseTreeLine("\u2514\u2500", "Pressure", pressure),
     "",
-    `<b>\u{1F3AF} ᴘʟᴀɴ: ${escapeHtml(smallCapsDisplay(plan))}</b>`,
-    pulseTreeLine("\u251C\u2500", "Best", laneExplainer?.bestLaneLabel ?? "Unavailable"),
+    `<b>\u25CE ᴘʟᴀɴ: ${escapeHtml(smallCapsDisplay(plan))}</b>`,
+    pulseTreeLine("\u251C\u2500", "Lane", laneExplainer?.bestLaneLabel ?? "Unavailable"),
     pulseTreeLine("\u251C\u2500", "In", (laneExplainer?.ifInAction ?? "Unavailable").replace(/,\s+/g, " \u2022 ")),
     pulseTreeLine("\u2514\u2500", "Flat", (laneExplainer?.ifFlatAction ?? "Unavailable").replace(/,\s+/g, " \u2022 ")),
     "",
     ...(contextRows.length > 0 ? [
-      `<b>\u2727 ᴄᴏɴᴛᴇxᴛ</b>`,
+      `<b>\u{1F4CE} ᴄᴏɴᴛᴇxᴛ</b>`,
       ...groupContextRows(contextRows).map((c, i, arr) => pulseTreeLine(i === arr.length - 1 ? "\u2514\u2500" : "\u251C\u2500", c.label, c.value)),
       ""
     ] : []),
@@ -270,6 +270,19 @@ export function formatAlphaPulseMajorReturn(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return smallCapsDisplay("Unavailable");
   const rounded = Math.abs(value) < 0.05 ? 0 : Number(value.toFixed(1));
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`;
+}
+
+export function formatAlphaPulsePrice(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "---";
+  if (value >= 1000) {
+    const kValue = value / 1000;
+    if (kValue >= 10) {
+      return `${kValue.toFixed(1)}K`;
+    } else {
+      return `${kValue.toFixed(2)}K`;
+    }
+  }
+  return value.toFixed(1);
 }
 
 export function deriveMarketMoveMajorsSinceLastScan(input?: AlphaPulseMajorsInput): AlphaPulseMajors1h {
