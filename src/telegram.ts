@@ -134,9 +134,9 @@ export function formatRegimeAlert(
 
   const availableMajors: string[] = [];
   if (!dataStale) {
-    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`ʙᴛᴄ  $${formatAlphaPulsePrice(majorsInput?.btcPrice ?? null)} \u2022 ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
-    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`ᴇᴛʜ  $${formatAlphaPulsePrice(majorsInput?.ethPrice ?? null)} \u2022 ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
-    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱᴏʟ  $${formatAlphaPulsePrice(majorsInput?.solPrice ?? null)} \u2022 ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
+    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`₿  </b><code>$${formatAlphaPulsePrice(majorsInput?.btcPrice ?? null)}</code><b> │ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
+    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`Ξ  </b><code>$${formatAlphaPulsePrice(majorsInput?.ethPrice ?? null)}</code><b> │ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
+    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱ  </b><code>$${formatAlphaPulsePrice(majorsInput?.solPrice ?? null)}</code><b> │ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
   }
 
   const lines = [
@@ -144,7 +144,7 @@ export function formatRegimeAlert(
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
+    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: </b><code>${smallCapsDisplay(tempoContext.sessionPhase)}</code>`,
     "",
     `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>`,
     `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
@@ -157,7 +157,7 @@ export function formatRegimeAlert(
     ),
     "",
     ...(availableMajors.length > 0 ? [
-      `<b>\u{1F310} ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ</b>`,
+      `<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ</b>`,
       ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"} ${line}</b>`),
       ""
     ] : []),
@@ -203,7 +203,7 @@ export function formatHeartbeatAlert(
     `<b>${ALPHA_PULSE_HEADER}</b>`,
     ALERT_SEPARATOR,
     "",
-    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: ${smallCapsDisplay(tempoContext.sessionPhase)}</b>`,
+    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: </b><code>${smallCapsDisplay(tempoContext.sessionPhase)}</code>`,
     "",
     `<b>\u{1F321} ᴍᴏᴅᴇ: ${smallCapsDisplay(result.regime)}</b>`,
     `<b>\u251C ꜱᴄᴏʀᴇ: ${result.score}/100</b>`,

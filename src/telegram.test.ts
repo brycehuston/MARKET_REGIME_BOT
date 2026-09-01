@@ -194,7 +194,7 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.equal(lines[2], "\u2501".repeat(20));
   assert.deepEqual(lines.slice(-2), ["\u2501".repeat(20), "ᴘᴜʟꜱᴇ © ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ | v1.02"]);
 
-    assert.match(alert, /\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/b>/);
+    assert.match(alert, /\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ: <\/b><code>ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/code>/);
   assert.match(alert, /<b>\u{1F321} ᴍᴏᴅᴇ: ʀɪꜱᴋ-ᴏɴ<\/b>/u);
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
   assert.match(alert, /<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
@@ -280,7 +280,8 @@ function testHtmlEscapingAndBalancedBoldTags(): void {
   const alert = pulse(sampleResult(70, "Risk-On"), undefined, freshMarketData, majorsInput(), escapedLane);
   assert.match(alert, /ᴛʀᴀɪʟ &lt; ᴘʀᴏᴛᴇᴄᴛ &amp; ᴅᴏɴ&#39;ᴛ ᴄʜᴀꜱᴇ/);
   assert.equal((alert.match(/<b>/g) ?? []).length, (alert.match(/<\/b>/g) ?? []).length);
-  assert.doesNotMatch(alert.replaceAll("<b>", "").replaceAll("</b>", ""), /[<>]/);
+  assert.equal((alert.match(/<code>/g) ?? []).length, (alert.match(/<\/code>/g) ?? []).length);
+  assert.doesNotMatch(alert.replaceAll("<b>", "").replaceAll("</b>", "").replaceAll("<code>", "").replaceAll("</code>", ""), /[<>]/);
 }
 
 function marketMoveMajors(
@@ -346,12 +347,12 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
 
   assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
   assert.match(move, /<b>└─ ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
-  assert.match(move, /<b>🌐 ᴍᴀᴊᴏʀꜱ • ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/);
+  assert.match(move, /<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɪᴍᴘʀᴏᴠɪɴɢ</b>"));
 
-  assert.ok(move.includes("<b>\u251C ʙᴛᴄ  $60.6K \u2022 +0.3%</b>"));
-  assert.ok(move.includes("<b>\u251C ᴇᴛʜ  $1.98K \u2022 +0.5%</b>"));
-  assert.ok(move.includes("<b>\u2514 ꜱᴏʟ  $100.0 \u2022 +1.1%</b>"));
+  assert.ok(move.includes("<b>\u251C ₿  </b><code>$60.6K</code><b> │ +0.3%</b>"));
+  assert.ok(move.includes("<b>\u251C Ξ  </b><code>$1.98K</code><b> │ +0.5%</b>"));
+  assert.ok(move.includes("<b>\u2514 ꜱ  </b><code>$100.0</code><b> │ +1.1%</b>"));
 
   assert.doesNotMatch(move, /(?<!2)4[hʜ]/i);
   assert.doesNotMatch(move, /ᴍᴀᴊᴏʀꜱ 1ʜ/i);
@@ -506,9 +507,9 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(causal.includes("<b>\u251C ʙᴛᴄ  $60.6K \u2022 +0.3%</b>"));
-  assert.ok(causal.includes("<b>\u251C ᴇᴛʜ  $1.98K \u2022 +0.5%</b>"));
-  assert.ok(causal.includes("<b>\u2514 ꜱᴏʟ  $100.0 \u2022 +1.1%</b>"));
+  assert.ok(causal.includes("<b>\u251C ₿  </b><code>$60.6K</code><b> │ +0.3%</b>"));
+  assert.ok(causal.includes("<b>\u251C Ξ  </b><code>$1.98K</code><b> │ +0.5%</b>"));
+  assert.ok(causal.includes("<b>\u2514 ꜱ  </b><code>$100.0</code><b> │ +1.1%</b>"));
 
   const unavailable = formatRegimeAlert(
     current,
@@ -525,7 +526,7 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(!unavailable.includes("\u{1F310} ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ"));
+  assert.ok(!unavailable.includes("\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ"));
 
   const tooOld = formatRegimeAlert(
     current,
@@ -542,7 +543,7 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(!tooOld.includes("\u{1F310} MAJORS \u2022 LAST SCAN"));
+  assert.ok(!tooOld.includes("\u2261 MAJORS \u2022 LAST SCAN"));
 }
 
 function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
