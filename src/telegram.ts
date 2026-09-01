@@ -3,7 +3,7 @@ import { ActionGuidance, EventContext, LaneExplainerHistoryPoint, LaneExplainerR
 
 const ALERT_SEPARATOR = "\u2501".repeat(20);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
-const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.02";
+const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 <b>\u00A9</b> \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 <b>|</b> v1.02";
 const ALPHA_PULSE_HEADER = "\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07";
 const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD", "FRED", "TGA", "NY"]);
 export interface TempoTapeContext {
@@ -123,20 +123,20 @@ export function formatRegimeAlert(
   const marketContext = dataStale ? "Unavailable" : laneExplainer?.chopState ?? "Unavailable";
 
   const directionSuffix = (previousResult && previousResult.score !== result.score)
-    ? (result.score > previousResult.score ? " \u2197" : (event.label === "Score Slip" ? " \u2193" : " \u2198"))
+    ? (result.score > previousResult.score ? " \u2B08" : (event.label === "Score Slip" ? " \u2193" : " \u2B0A"))
     : "";
 
   const scoreDisplay = (previousResult && previousResult.score !== result.score)
-    ? `\u3010 ${previousResult.score} \u2192 ${result.score} \u3011${directionSuffix}`
+    ? `\u3010 ${previousResult.score} \u2192 ${result.score} \u3011`
     : `\u3010 ${result.score}/100 \u3011`;
 
   const statusText = dataStale ? "noisy / neutral" : marketMoveStatusText(result, previousResult);
 
   const availableMajors: string[] = [];
   if (!dataStale) {
-    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`₿  </b><code>$${formatAlphaPulsePrice(majorsInput?.btcPrice ?? null)}</code><b> │ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}`);
-    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`Ξ  </b><code>$${formatAlphaPulsePrice(majorsInput?.ethPrice ?? null)}</code><b> │ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}`);
-    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱ  </b><code>$${formatAlphaPulsePrice(majorsInput?.solPrice ?? null)}</code><b> │ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}`);
+    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`₿  ${formatMarketMoveMajorsPrice(majorsInput?.btcPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}</b>`);
+    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`Ξ  ${formatMarketMoveMajorsPrice(majorsInput?.ethPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}</b>`);
+    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱ  ${formatMarketMoveMajorsPrice(majorsInput?.solPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}</b>`);
   }
 
   const lines = [
@@ -144,12 +144,16 @@ export function formatRegimeAlert(
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: </b><code>${smallCapsDisplay(tempoContext.sessionPhase)}</code>`,
+    `${formatSessionIcon(tempoContext.sessionPhase)} ${formatSessionText(tempoContext.sessionPhase)}`,
     "",
-    `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>`,
+    `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>${directionSuffix}`,
     `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
     "",
-    `<b>\u2316 ꜱɪɢɴᴀʟ: ${escapeHtml(smallCapsDisplay(event.label))}</b>`,
+    `<b>\u2727 ʀᴇᴀᴅ</b>`,
+    pulseTreeTextLine(readLines.length > 1 ? "\u251C\u2500" : "\u2514\u2500", readLines[0] ?? "Market state changed."),
+    ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
+    "",
+    `<b>\u{1F3AF} ꜱɪɢɴᴀʟ: ${escapeHtml(smallCapsDisplay(event.label))}</b>`,
     pulseTreeLine(
       "\u2514\u2500",
       "Confidence",
@@ -158,13 +162,9 @@ export function formatRegimeAlert(
     "",
     ...(availableMajors.length > 0 ? [
       `<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ</b>`,
-      ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"} ${line}</b>`),
+      ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"}</b> ${line}`),
       ""
     ] : []),
-    `<b>\u2727 ʀᴇᴀᴅ</b>`,
-    pulseTreeTextLine(readLines.length > 1 ? "\u251C\u2500" : "\u2514\u2500", readLines[0] ?? "Market state changed."),
-    ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
-    "",
     `<b>\u{1F30A} ᴄᴏɴᴛᴇxᴛ</b>`,
     pulseTreeLine(contextRows.length > 0 ? "\u251C\u2500" : "\u2514\u2500", "Market", marketContext),
     ...groupContextRows(contextRows).map((c, i, arr) => pulseTreeLine(i === arr.length - 1 ? "\u2514\u2500" : "\u251C\u2500", c.label, c.value)),
@@ -203,7 +203,7 @@ export function formatHeartbeatAlert(
     `<b>${ALPHA_PULSE_HEADER}</b>`,
     ALERT_SEPARATOR,
     "",
-    `${formatSessionIcon(tempoContext.sessionPhase)} <b>ꜱᴇꜱꜱɪᴏɴ: </b><code>${smallCapsDisplay(tempoContext.sessionPhase)}</code>`,
+    `${formatSessionIcon(tempoContext.sessionPhase)} ${formatSessionText(tempoContext.sessionPhase)}`,
     "",
     `<b>\u{1F321} ᴍᴏᴅᴇ: ${smallCapsDisplay(result.regime)}</b>`,
     `<b>\u251C ꜱᴄᴏʀᴇ: ${result.score}/100</b>`,
@@ -283,6 +283,33 @@ export function formatAlphaPulsePrice(value: number | null): string {
     }
   }
   return value.toFixed(1);
+}
+
+export function formatSessionText(sessionPhase: string): string {
+  const smallCaps = smallCapsDisplay(sessionPhase);
+  const match = smallCaps.match(/(.*?)(ʟᴏɴᴅᴏɴ\/ɴʏ|ʟᴏɴᴅᴏɴ|ᴀꜱɪᴀ|ɴʏ)(.*)/);
+  if (match) {
+    const before = match[1] ? `<b>${match[1]}</b>` : "";
+    const geo = `<code>${match[2]}</code>`;
+    const after = match[3] ? `<b>${match[3]}</b>` : "";
+    return `<b>ꜱᴇꜱꜱɪᴏɴ: </b>${before}${geo}${after}`.replace(/<\/b><b>/g, "");
+  }
+  return `<b>ꜱᴇꜱꜱɪᴏɴ: ${smallCaps}</b>`;
+}
+
+export function formatMarketMoveMajorsPrice(price: number | null): string {
+  if (price === null) return "<b>$</b><code>---</code>";
+  const str = formatAlphaPulsePrice(price);
+  const match = str.match(/^([\d\.]+)(K)?$/);
+  if (!match) return `<b>$</b><code>${str}</code>`;
+
+  const numPart = match[1];
+  const suffix = match[2] ? "ᴋ" : "";
+
+  const numParts = numPart.split(".");
+  const monoNum = numParts.map(p => `<code>${p}</code>`).join("<b>.</b>");
+
+  return `<b>$</b>${monoNum}${suffix ? `<b>${suffix}</b>` : ""}`;
 }
 
 export function deriveMarketMoveMajorsSinceLastScan(input?: AlphaPulseMajorsInput): AlphaPulseMajors1h {
@@ -1929,7 +1956,7 @@ function mixedWatch(): string[] {
 
 
 
-function formatSessionIcon(phase: string): string {
+export function formatSessionIcon(phase: string): string {
   if (phase.includes("overlap") || phase.includes("\u00D7") || phase.includes("x")) return "\u26A1";
   if (phase.toLowerCase().includes("weekend") || phase.toLowerCase().includes("late") || phase.toLowerCase().includes("off")) return "\u25CC";
   return "\u25C8";

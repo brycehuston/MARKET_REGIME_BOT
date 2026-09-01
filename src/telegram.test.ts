@@ -192,9 +192,9 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.equal(lines[0], "\u2501".repeat(20));
   assert.equal(lines[1], "<b>\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07</b>");
   assert.equal(lines[2], "\u2501".repeat(20));
-  assert.deepEqual(lines.slice(-2), ["\u2501".repeat(20), "ᴘᴜʟꜱᴇ © ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ | v1.02"]);
+  assert.deepEqual(lines.slice(-2), ["\u2501".repeat(20), "ᴘᴜʟꜱᴇ <b>©</b> ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ <b>|</b> v1.02"]);
 
-    assert.match(alert, /\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ: <\/b><code>ᴍɪᴅ ʟᴏɴᴅᴏɴ<\/code>/);
+    assert.match(alert, /\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ <\/b><code>ʟᴏɴᴅᴏɴ<\/code>/);
   assert.match(alert, /<b>\u{1F321} ᴍᴏᴅᴇ: ʀɪꜱᴋ-ᴏɴ<\/b>/u);
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
   assert.match(alert, /<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
@@ -345,14 +345,14 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
     "<b>📈 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>\u{1F3AF} ꜱɪɢɴᴀʟ: ʀᴇɢɪᴍᴇ ᴄʜᴀɴɢᴇ<\/b>/u);
   assert.match(move, /<b>└─ ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
   assert.match(move, /<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɪᴍᴘʀᴏᴠɪɴɢ</b>"));
 
-  assert.ok(move.includes("<b>\u251C ₿  </b><code>$60.6K</code><b> │ +0.3%</b>"));
-  assert.ok(move.includes("<b>\u251C Ξ  </b><code>$1.98K</code><b> │ +0.5%</b>"));
-  assert.ok(move.includes("<b>\u2514 ꜱ  </b><code>$100.0</code><b> │ +1.1%</b>"));
+  assert.ok(move.includes("<b>\u251C</b> ₿  <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> │ +0.3%</b>"));
+  assert.ok(move.includes("<b>\u251C</b> Ξ  <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> │ +0.5%</b>"));
+  assert.ok(move.includes("<b>\u2514</b> ꜱ  <b>$</b><code>100</code><b>.</b><code>0</code><b> │ +1.1%</b>"));
 
   assert.doesNotMatch(move, /(?<!2)4[hʜ]/i);
   assert.doesNotMatch(move, /ᴍᴀᴊᴏʀꜱ 1ʜ/i);
@@ -363,7 +363,7 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
 
   assert.equal(
     move.split("\n").at(-1),
-    "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.02"
+    "\u1D18\u1D1C\u029F\uA731\u1D07 <b>\u00A9</b> \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 <b>|</b> v1.02"
   );
 
   assert.equal(
@@ -401,9 +401,9 @@ function testMarketMoveScoreSlipOmitsUnchangedState(): void {
     "<b>📉 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ꜱᴄᴏʀᴇ ꜱʟɪᴘ<\/b>/);
+  assert.match(move, /<b>\u{1F3AF} ꜱɪɢɴᴀʟ: ꜱᴄᴏʀᴇ ꜱʟɪᴘ<\/b>/u);
 
-  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 70 → 64 】 ↓<\/b>/);
+  assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 70 → 64 】<\/b> \u2193/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ᴅᴇᴛᴇʀɪᴏʀᴀᴛɪɴɢ</b>"));
 
   assert.doesNotMatch(move, /[├└]─ ʀɪꜱᴋ:/);
@@ -439,7 +439,7 @@ function testMarketMoveLeadershipOnlyChange(): void {
     "<b>🔄 ᴀʟᴘʜᴀ | ᴍᴀʀᴋᴇᴛ ᴍᴏᴠᴇ</b>"
   );
 
-  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>\u{1F3AF} ꜱɪɢɴᴀʟ: ʟᴇᴀᴅᴇʀꜱʜɪᴘ ᴄʜᴀɴɢᴇ<\/b>/u);
   assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 64\/100 】<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɴᴏɪꜱʏ \/ ɴᴇᴜᴛʀᴀʟ</b>"));
   assert.doesNotMatch(move, /\[\s*\]\s*ꜱᴄᴏʀᴇ:/);
@@ -469,7 +469,7 @@ function testMarketMoveConfidenceOnlyChange(): void {
     marketMoveMajors()
   );
 
-  assert.match(move, /<b>\u2316 ꜱɪɢɴᴀʟ: ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ<\/b>/);
+  assert.match(move, /<b>\u{1F3AF} ꜱɪɢɴᴀʟ: ᴄᴏɴꜰɪᴅᴇɴᴄᴇ ᴄʜᴀɴɢᴇ<\/b>/u);
   assert.match(move, /<b>📊 ꜱᴄᴏʀᴇ: 【 58\/100 】<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɴᴏɪꜱʏ \/ ɴᴇᴜᴛʀᴀʟ</b>"));
 
@@ -507,9 +507,9 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(causal.includes("<b>\u251C ₿  </b><code>$60.6K</code><b> │ +0.3%</b>"));
-  assert.ok(causal.includes("<b>\u251C Ξ  </b><code>$1.98K</code><b> │ +0.5%</b>"));
-  assert.ok(causal.includes("<b>\u2514 ꜱ  </b><code>$100.0</code><b> │ +1.1%</b>"));
+  assert.ok(causal.includes("<b>\u251C</b> ₿  <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> │ +0.3%</b>"));
+  assert.ok(causal.includes("<b>\u251C</b> Ξ  <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> │ +0.5%</b>"));
+  assert.ok(causal.includes("<b>\u2514</b> ꜱ  <b>$</b><code>100</code><b>.</b><code>0</code><b> │ +1.1%</b>"));
 
   const unavailable = formatRegimeAlert(
     current,
@@ -575,7 +575,7 @@ function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
     })
   );
 
-  assert.match(stale, /<b>\u2316 ꜱɪɢɴᴀʟ: ᴍᴏᴠᴇ ᴜɴᴠᴇʀɪꜰɪᴇᴅ<\/b>/);
+  assert.match(stale, /<b>\u{1F3AF} ꜱɪɢɴᴀʟ: ᴍᴏᴠᴇ ᴜɴᴠᴇʀɪꜰɪᴇᴅ<\/b>/u);
   assert.equal(
     (stale.match(/Unavailable|ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ/gi) ?? []).length >= 1,
     true
@@ -587,7 +587,7 @@ function testMarketMoveStaleSafetyAndConditionalEventContext(): void {
 }
 function testExistingGenericHeaderFooterAndCapitalizationRemainStable(): void {
   assert.equal(formatHeader("MARKET", selectMarketMoveHeaderEmoji(10), "MOVE")[1], "\u2022  <b>MARKET \u{1F6A8} MOVE</b>  \u2022");
-  assert.deepEqual(formatFooter(), ["\u2501".repeat(20), "\u1D18\u1D1C\u029F\uA731\u1D07 \u00A9 \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 | v1.02"]);
+  assert.deepEqual(formatFooter(), ["\u2501".repeat(20), "\u1D18\u1D1C\u029F\uA731\u1D07 <b>\u00A9</b> \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 <b>|</b> v1.02"]);
   assert.equal(titleCaseDisplay("btc and sol repair by 09:15 utc during us holiday"), "BTC And SOL Repair By 09:15 UTC During US Holiday");
 }
 
