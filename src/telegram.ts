@@ -3,6 +3,7 @@ import { ActionGuidance, EventContext, LaneExplainerHistoryPoint, LaneExplainerR
 
 const ALERT_SEPARATOR = "\u2501".repeat(20);
 const MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD = 10;
+const MARKET_MOVE_MAJOR_RETURN_WARNING_PCT = 1.5;
 const FOOTER = "\u1D18\u1D1C\u029F\uA731\u1D07 <b>\u00A9</b> \u1D00\u029F\u1D18\u029C\u1D00 \u1D00\u029F\u1D07\u0280\u1D1B\uA731 <b>|</b> v1.02";
 const ALPHA_PULSE_HEADER = "\u2764\uFE0F\u200D\u{1F525} \u1D00\u029F\u1D18\u029C\u1D00 | \u1D18\u1D1C\u029F\uA731\u1D07";
 const DISPLAY_ACRONYMS = new Set(["BTC", "ETH", "SOL", "US", "USD", "UTC", "ETF", "FOMC", "CPI", "PPI", "ATH", "ATL", "RSI", "MACD", "FRED", "TGA", "NY"]);
@@ -126,29 +127,54 @@ export function formatRegimeAlert(
     ? (result.score > previousResult.score ? " \u2B08" : (event.label === "Score Slip" ? " \u2193" : " \u2B0A"))
     : "";
 
+  let scoreWarning = "";
+  if (previousResult && Math.abs(result.score - previousResult.score) >= MARKET_MOVE_BIG_DELTA_DISPLAY_THRESHOLD) {
+    scoreWarning = " \u26A0";
+  }
+
   const scoreDisplay = (previousResult && previousResult.score !== result.score)
     ? `\u3010 ${previousResult.score} \u2192 ${result.score} \u3011`
     : `\u3010 ${result.score}/100 \u3011`;
 
   const statusText = dataStale ? "noisy / neutral" : marketMoveStatusText(result, previousResult);
 
+  let btcWarn = false;
+  let ethWarn = false;
+  let solWarn = false;
+  let bigCount = 0;
+  if (!dataStale) {
+    if (majors.btcReturnPct != null && Math.abs(majors.btcReturnPct) >= MARKET_MOVE_MAJOR_RETURN_WARNING_PCT) { btcWarn = true; bigCount++; }
+    if (majors.ethReturnPct != null && Math.abs(majors.ethReturnPct) >= MARKET_MOVE_MAJOR_RETURN_WARNING_PCT) { ethWarn = true; bigCount++; }
+    if (majors.solReturnPct != null && Math.abs(majors.solReturnPct) >= MARKET_MOVE_MAJOR_RETURN_WARNING_PCT) { solWarn = true; bigCount++; }
+  }
+
+  const allThreeBig = bigCount === 3;
+  const titleWarning = allThreeBig ? " \u26A0" : "";
+
   const availableMajors: string[] = [];
   if (!dataStale) {
-    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`₿  ${formatMarketMoveMajorsPrice(majorsInput?.btcPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}</b>`);
-    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`Ξ  ${formatMarketMoveMajorsPrice(majorsInput?.ethPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}</b>`);
-    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱ  ${formatMarketMoveMajorsPrice(majorsInput?.solPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}</b>`);
+    if (majors.btcReturnPct !== null && majors.btcReturnPct !== undefined) availableMajors.push(`₿ ${formatMarketMoveMajorsPrice(majorsInput?.btcPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.btcReturnPct)}</b>${(!allThreeBig && btcWarn) ? " \u26A0" : ""}`);
+    if (majors.ethReturnPct !== null && majors.ethReturnPct !== undefined) availableMajors.push(`Ξ ${formatMarketMoveMajorsPrice(majorsInput?.ethPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.ethReturnPct)}</b>${(!allThreeBig && ethWarn) ? " \u26A0" : ""}`);
+    if (majors.solReturnPct !== null && majors.solReturnPct !== undefined) availableMajors.push(`ꜱ ${formatMarketMoveMajorsPrice(majorsInput?.solPrice ?? null)}<b> │ ${formatAlphaPulseMajorReturn(majors.solReturnPct)}</b>${(!allThreeBig && solWarn) ? " \u26A0" : ""}`);
   }
+
+  const nowLine = `<b>\u25CE ɴᴏᴡ: ${escapeHtml(smallCapsDisplay(deriveNowLine(result, guidance)))}</b>`;
 
   const lines = [
     ALERT_SEPARATOR,
     pulseSectionLine(directionIcon, "Alpha | Market Move"),
     ALERT_SEPARATOR,
     "",
-    `${formatSessionIcon(tempoContext.sessionPhase)} ${formatSessionText(tempoContext.sessionPhase)}`,
+    nowLine,
     "",
-    `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>${directionSuffix}`,
+    `<b>📊 ꜱᴄᴏʀᴇ: ${scoreDisplay}</b>${directionSuffix}${scoreWarning}`,
     `<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ${smallCapsDisplay(statusText)}</b>`,
     "",
+    ...(availableMajors.length > 0 ? [
+      `<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ${titleWarning}</b>`,
+      ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"}</b> ${line}`),
+      ""
+    ] : []),
     `<b>\u2727 ʀᴇᴀᴅ</b>`,
     pulseTreeTextLine(readLines.length > 1 ? "\u251C\u2500" : "\u2514\u2500", readLines[0] ?? "Market state changed."),
     ...(readLines[1] ? [pulseTreeTextLine("\u2514\u2500", readLines[1])] : []),
@@ -160,11 +186,8 @@ export function formatRegimeAlert(
       dataStale ? "Degraded \u2014 stale data" : regimeConfidenceLabel(regimeConfidence)
     ),
     "",
-    ...(availableMajors.length > 0 ? [
-      `<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ</b>`,
-      ...availableMajors.map((line, idx) => `<b>${idx === availableMajors.length - 1 ? "\u2514" : "\u251C"}</b> ${line}`),
-      ""
-    ] : []),
+    `${formatSessionIcon(tempoContext.sessionPhase)} ${formatSessionText(tempoContext.sessionPhase)}`,
+    "",
     `<b>\u{1F30A} ᴄᴏɴᴛᴇxᴛ</b>`,
     pulseTreeLine(contextRows.length > 0 ? "\u251C\u2500" : "\u2514\u2500", "Market", marketContext),
     ...groupContextRows(contextRows).map((c, i, arr) => pulseTreeLine(i === arr.length - 1 ? "\u2514\u2500" : "\u251C\u2500", c.label, c.value)),
@@ -207,12 +230,13 @@ export function formatHeartbeatAlert(
     "",
     `<b>\u{1F321} ᴍᴏᴅᴇ: ${smallCapsDisplay(result.regime)}</b>`,
     `<b>\u251C ꜱᴄᴏʀᴇ: ${result.score}/100</b>`,
-    `<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ${smallCapsDisplay(regimeConfidenceLabel(regimeConfidence))}</b>`,
+    `<b>\u251C ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ${smallCapsDisplay(regimeConfidenceLabel(regimeConfidence))}</b>`,
+    `<b>\u2514 ᴏᴜᴛʟᴏᴏᴋ: ${smallCapsDisplay(deriveOutlook(result, guidance, regimeConfidence, laneExplainer))}</b>`,
     "",
-    `<b>\u2261 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ</b>`,
-    formatReturnsRow("ʙᴛᴄ", majorsInput?.retBtc1h, laneExplainer?.retBtc1d, laneExplainer?.retBtc7d, false),
-    formatReturnsRow("ᴇᴛʜ", majorsInput?.retEth1h, laneExplainer?.retEth1d, laneExplainer?.retEth7d, false),
-    formatReturnsRow("ꜱᴏʟ", majorsInput?.retSol1h, laneExplainer?.retSol1d, laneExplainer?.retSol7d, true),
+    `<b>\u2261 ᴍᴀᴊᴏʀꜱ     1ʜ \u2022 24ʜ \u2022 7ᴅ</b>`,
+    formatReturnsRow("₿", majorsInput?.btcPrice, majorsInput?.retBtc1h, laneExplainer?.retBtc1d, laneExplainer?.retBtc7d, false),
+    formatReturnsRow("Ξ", majorsInput?.ethPrice, majorsInput?.retEth1h, laneExplainer?.retEth1d, laneExplainer?.retEth7d, false),
+    formatReturnsRow("ꜱ", majorsInput?.solPrice, majorsInput?.retSol1h, laneExplainer?.retSol1d, laneExplainer?.retSol7d, true),
     "",
     `<b>\u{1F30A} ᴍᴀʀᴋᴇᴛ</b>`,
     pulseTreeLine("\u251C\u2500", "Rotation", !liquidityRotation ? "UNAVAILABLE" : (liquidityRotation.rotationState === "ALT_ROTATION_CONFIRMED" ? `${liquidityRotation.rotationFromLane ?? "NONE"} \u2192 ${liquidityRotation.rotationToLane ?? "NONE"}` : (liquidityRotation.rotationState === "NO_CLEAR_ROTATION" ? "NONE" : "UNAVAILABLE"))),
@@ -1962,16 +1986,14 @@ export function formatSessionIcon(phase: string): string {
   return "\u25C8";
 }
 
-function formatReturnsRow(name: string, ret1h?: number | null, ret1d?: number | null, ret7d?: number | null, isLast = false): string {
+function formatReturnsRow(symbol: string, price: number | null | undefined, ret1h?: number | null, ret1d?: number | null, ret7d?: number | null, isLast = false): string {
+  const pStr = formatMarketMoveMajorsPrice(price ?? null);
   const h1 = (ret1h != null && Number.isFinite(ret1h)) ? formatAlphaPulseMajorReturn(ret1h) : smallCapsDisplay("Unav");
   const d1 = (ret1d != null && Number.isFinite(ret1d)) ? formatAlphaPulseMajorReturn(ret1d) : smallCapsDisplay("Unav");
   const d7 = (ret7d != null && Number.isFinite(ret7d)) ? formatAlphaPulseMajorReturn(ret7d) : smallCapsDisplay("Unav");
 
-  const h1Pad = h1.padEnd(5, ' ');
-  const d1Pad = d1.padEnd(5, ' ');
-
   const prefix = isLast ? "\u2514" : "\u251C";
-  return `<b>${prefix} ${name}  ${h1Pad} \u2502 ${d1Pad} \u2502 ${d7}</b>`;
+  return `<b>${prefix} ${symbol}</b> ${pStr}<b> \u2502 ${h1} \u2502 ${d1} \u2502 ${d7}</b>`;
 }
 export function formatAlphaPulseMajor(price: number | null | undefined, ret1h: number | null | undefined, ret4h: number | null | undefined, ret1d: number | null | undefined): string {
   if (price == null || !Number.isFinite(price)) return smallCapsDisplay("Unavailable");
@@ -2016,4 +2038,33 @@ export function formatStartupAlert(scanIntervalMinutes: number): string {
     "ᴘᴜʟꜱᴇ <b>\u00A9</b> ᴀʟᴘʜᴀ ᴀʟᴇʀᴛꜱ",
     "<b>\u2502</b> v1.02"
   ].join("\n");
+}
+
+export function deriveOutlook(result: RegimeScoreResult, guidance: ActionGuidance, confidence: RegimeConfidence, laneExplainer?: LaneExplainerResult): string {
+  const isDefensiveAction = ["STAY IN STABLES", "WAIT / MOSTLY STABLES"].includes(guidance.action);
+  if (result.regime === "Risk-Off" || result.regime === "Defensive" || isDefensiveAction) {
+    return "DEFENSIVE";
+  }
+
+  const isRiskOn = result.regime === "Risk-On" || result.regime === "Strong Risk-On / Rotation";
+  const isRiskLane = ["BTC WATCH", "BTC FOCUS", "ETH WATCH", "ETH ROTATION", "SOL ROTATION"].includes(guidance.action) ||
+    ["BTC-led", "ETH-led", "SOL-led"].includes(result.leader);
+  const isChoppy = laneExplainer?.chopState === "Choppy" || laneExplainer?.chopState === "Mixed";
+
+  if (isRiskOn && confidence === "Confirmed" && isRiskLane && !isChoppy) {
+    return "FAVORABLE";
+  }
+
+  return "SELECTIVE";
+}
+
+export function deriveNowLine(result: RegimeScoreResult, guidance: ActionGuidance): string {
+  if (result.regime === "Risk-Off" || guidance.action === "STAY IN STABLES") return "PROTECT \u2192 STABLES";
+  if (guidance.action === "WAIT / MOSTLY STABLES" || guidance.action === "NO CLEAN EDGE" || result.regime === "Neutral / Chop") return "WAIT / NO CLEAN LANE";
+  if (guidance.action === "SOL ROTATION" || result.leader === "SOL-led") return "SOL FAVORED";
+  if (guidance.action === "ETH WATCH" || guidance.action === "ETH ROTATION" || result.leader === "ETH-led") return "ETH FAVORED";
+  if (guidance.action === "BTC FOCUS") return "BTC ONLY";
+  if (guidance.action === "BTC WATCH" || result.leader === "BTC-led") return "BTC FAVORED";
+  if (result.regime === "Defensive") return "PROTECT \u2192 STABLES";
+  return "WAIT / NO CLEAN LANE";
 }

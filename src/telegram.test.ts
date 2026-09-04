@@ -197,7 +197,8 @@ function testLockedShellRuntimeValuesAndOrder(): void {
     assert.match(alert, /\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ: ᴍɪᴅ <\/b><code>ʟᴏɴᴅᴏɴ<\/code>/);
   assert.match(alert, /<b>\u{1F321} ᴍᴏᴅᴇ: ʀɪꜱᴋ-ᴏɴ<\/b>/u);
   assert.match(alert, /<b>\u251C ꜱᴄᴏʀᴇ: 70\/100<\/b>/);
-  assert.match(alert, /<b>\u2514 ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
+  assert.match(alert, /<b>\u251C ᴄᴏɴꜰɪᴅᴇɴᴄᴇ: ɴᴏɪꜱʏ<\/b>/);
+  assert.match(alert, /<b>\u2514 ᴏᴜᴛʟᴏᴏᴋ: ꜱᴇʟᴇᴄᴛɪᴠᴇ<\/b>/);
 
   assert.match(alert, /<b>🌊 ᴍᴀʀᴋᴇᴛ<\/b>/);
   assert.match(alert, /<b>└─ ᴘʀᴇꜱꜱᴜʀᴇ: ꜱᴏʟ ʟᴇᴀᴅɪɴɢ<\/b>/);
@@ -209,7 +210,7 @@ function testLockedShellRuntimeValuesAndOrder(): void {
   assert.match(alert, /<b>└─ ꜰʟᴀᴛ: ᴡᴀɪᴛ ꜰᴏʀ ʙᴛᴄ ʀᴇᴘᴀɪʀ<\/b>/);
   assert.match(alert, /◷ ɴᴇxᴛ ꜱᴄᴀɴ: \d{2}:\d{2} ᴜᴛᴄ • ~1[45]ᴍ/);
 
-  const ordered = ["\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ", "\u{1F321} ᴍᴏᴅᴇ", "\u2261 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ", "\u25CE ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "◷ ɴᴇxᴛ ꜱᴄᴀɴ"];
+  const ordered = ["\u25C8 <b>ꜱᴇꜱꜱɪᴏɴ", "\u{1F321} ᴍᴏᴅᴇ", "\u2261 ᴍᴀᴊᴏʀꜱ     1ʜ \u2022 24ʜ \u2022 7ᴅ", "\u{1F30A} ᴍᴀʀᴋᴇᴛ", "\u25CE ᴘʟᴀɴ", "\u{1F4CE} ᴄᴏɴᴛᴇxᴛ", "◷ ɴᴇxᴛ ꜱᴄᴀɴ"];
   for (let index = 1; index < ordered.length; index += 1) assert.ok(alert.indexOf(ordered[index - 1]) !== -1 && alert.indexOf(ordered[index - 1]) < alert.indexOf(ordered[index]));
 }
 
@@ -221,14 +222,14 @@ function testCausalMajorsAndFormatting(): void {
   assert.equal(derived.solReturnPct, 0);
 
   const alert = pulse();
-  assert.ok(alert.includes("<b>\u251C ʙᴛᴄ  +1.0% │ +2.1% │ +6.4%</b>"));
-  assert.ok(alert.includes("<b>\u251C ᴇᴛʜ  -1.0% │ +3.8% │ +9.7%</b>"));
-  assert.ok(alert.includes("<b>\u2514 ꜱᴏʟ  0.0%  │ +5.1% │ +14.2%</b>"));
+  assert.ok(alert.includes("<b>\u251C ₿</b> <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> \u2502 +1.0% \u2502 +2.1% \u2502 +6.4%</b>"));
+  assert.ok(alert.includes("<b>\u251C Ξ</b> <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> \u2502 -1.0% \u2502 +3.8% \u2502 +9.7%</b>"));
+  assert.ok(alert.includes("<b>\u2514 ꜱ</b> <b>$</b><code>100</code><b>.</b><code>0</code><b> \u2502 0.0% \u2502 +5.1% \u2502 +14.2%</b>"));
 
-  assert.match(alert, /\u2261 ᴍᴀᴊᴏʀꜱ 1ʜ \u2022 24ʜ \u2022 7ᴅ/);
-  assert.doesNotMatch(alert, /\$60\.6K/);
-  assert.doesNotMatch(alert, /\$1\.98K/);
-  assert.doesNotMatch(alert, /\$100\.0/);
+  assert.match(alert, /\u2261 ᴍᴀᴊᴏʀꜱ     1ʜ \u2022 24ʜ \u2022 7ᴅ/);
+  assert.match(alert, /\$<\/b><code>60<\/code><b>\.<\/b><code>6<\/code><b>ᴋ<\/b>/);
+  assert.match(alert, /\$<\/b><code>1<\/code><b>\.<\/b><code>98<\/code><b>ᴋ<\/b>/);
+  assert.match(alert, /\$<\/b><code>100<\/code><b>\.<\/b><code>0<\/code>/);
   assert.doesNotMatch(alert, /(?<!2)4[hʜ]/i);
 
   const futureOnly = majorsInput({ history: [historyPoint("2026-07-03T08:01:00Z", 60_000, 2_000, 100)] });
@@ -350,9 +351,9 @@ function testMarketMoveRegimeChangeLockedLayout(): void {
   assert.match(move, /<b>\u2261 ᴍᴀᴊᴏʀꜱ \u2022 ʟᴀꜱᴛ ꜱᴄᴀɴ<\/b>/);
   assert.ok(move.includes("<b>\u2514 ꜱᴛᴀᴛᴜꜱ: ɪᴍᴘʀᴏᴠɪɴɢ</b>"));
 
-  assert.ok(move.includes("<b>\u251C</b> ₿  <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> │ +0.3%</b>"));
-  assert.ok(move.includes("<b>\u251C</b> Ξ  <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> │ +0.5%</b>"));
-  assert.ok(move.includes("<b>\u2514</b> ꜱ  <b>$</b><code>100</code><b>.</b><code>0</code><b> │ +1.1%</b>"));
+  assert.ok(move.includes("<b>\u251C</b> ₿ <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> \u2502 +0.3%</b>"));
+  assert.ok(move.includes("<b>\u251C</b> Ξ <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> \u2502 +0.5%</b>"));
+  assert.ok(move.includes("<b>\u2514</b> ꜱ <b>$</b><code>100</code><b>.</b><code>0</code><b> \u2502 +1.1%</b>"));
 
   assert.doesNotMatch(move, /(?<!2)4[hʜ]/i);
   assert.doesNotMatch(move, /ᴍᴀᴊᴏʀꜱ 1ʜ/i);
@@ -507,9 +508,9 @@ function testMarketMoveMajorsAreCausalOrUnavailable(): void {
     })
   );
 
-  assert.ok(causal.includes("<b>\u251C</b> ₿  <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> │ +0.3%</b>"));
-  assert.ok(causal.includes("<b>\u251C</b> Ξ  <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> │ +0.5%</b>"));
-  assert.ok(causal.includes("<b>\u2514</b> ꜱ  <b>$</b><code>100</code><b>.</b><code>0</code><b> │ +1.1%</b>"));
+  assert.ok(causal.includes("<b>\u251C</b> ₿ <b>$</b><code>60</code><b>.</b><code>6</code><b>ᴋ</b><b> │ +0.3%</b>"));
+  assert.ok(causal.includes("<b>\u251C</b> Ξ <b>$</b><code>1</code><b>.</b><code>98</code><b>ᴋ</b><b> │ +0.5%</b>"));
+  assert.ok(causal.includes("<b>\u2514</b> ꜱ <b>$</b><code>100</code><b>.</b><code>0</code><b> │ +1.1%</b>"));
 
   const unavailable = formatRegimeAlert(
     current,
