@@ -12,7 +12,7 @@ import { buildEventContext, formatEventContextSummary } from "./eventContext";
 import { deriveLaneExplainer } from "./laneExplainer";
 import { deriveLiquidityRotationTelemetry } from "./liquidityRotation";
 import { assessMarketDataFreshness, LIVE_PRICE_MAX_AGE_MINUTES } from "./marketDataFreshness";
-import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance, deriveAlphaPulseMajors1h, formatStartupAlert } from "./telegram";
+import { TelegramClient, buildTempoTapeContext, deriveRegimeConfidence, formatHeartbeatAlert, formatRegimeAlert, getActionGuidance, deriveAlphaPulseMajors1h, formatStartupAlert, deriveOutlook, deriveNowLine } from "./telegram";
 import { scoreMarketRegime } from "./scorer";
 import {
   loadLaneExplainerHistory,
@@ -186,6 +186,9 @@ export class MarketRegimeBot {
         marketDataStaleReason: freshness.marketDataStaleReason,
         history: laneHistory
       });
+
+      accuracyFields.outlookState = deriveOutlook(result, guidance, currentConfidence, laneExplainer);
+      accuracyFields.nowPosture = deriveNowLine(result, guidance);
 
       const liquidityRotationTelemetry = deriveLiquidityRotationTelemetry({
         timestamp: result.timestamp,

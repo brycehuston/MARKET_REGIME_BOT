@@ -37,13 +37,13 @@ Generation 2 or a Rust rewrite is not an active objective.
 
 ## Active Task Identity
 
-- Task ID: `AP-V102-SEMANTIC-CLEANUP`
+- Task ID: `AP-V1-OUTLOOK-NOW-TELEMETRY`
 - Checkpoint: `C01`
-- State: `VALIDATED`
+- State: `COMPLETED`
 - Repository: `MARKET_REGIME_BOT`
-- Branch: `feat/alpha-pulse-v102-semantic-cleanup`
-- Commit: `879226f68c1a0ef12b64915c27e7f6aa5c3ad32e` (pre-patch)
-- Resume token: `AP-V102-SEMANTIC-CLEANUP.C01@879226f`
+- Branch: `feat/telemetry-snapshot-outlook-now-v1`
+- Commit: `pending`
+- Resume token: `AP-V1-OUTLOOK-NOW-TELEMETRY.C01@pending`
 
 ## Verified Architecture Boundaries
 
@@ -104,12 +104,13 @@ Generation 2 or a Rust rewrite is not an active objective.
 - [x] Build the offline Liquidity Rotation research evaluator and measure provisional state behavior across development and holdout segments.
 - [x] Add bounded 7D major-return snapshot telemetry (retBtc7d / retEth7d / retSol7d) on branch `feat/alpha-pulse-7d-major-returns`.
 - [x] Turn the existing always-NO_CLEAR_ROTATION Liquidity Rotation telemetry into the validated confirmed-leadership-takeover shadow classifier.
-- [~] Update Alpha Pulse Telegram presentation to the locked v1.02 layouts (Alpha Pulse / Heartbeat, Market Move, distinct context, NO_CLEAR_ROTATION wording fix).
-- [ ] Record the evidence-based Generation 1 closeout decision.
+- [x] Update Alpha Pulse Telegram presentation to the locked v1.02 layouts (Alpha Pulse / Heartbeat, Market Move, distinct context, NO_CLEAR_ROTATION wording fix).
+- [x] Persist prospective Alpha Pulse OUTLOOK and NOW/posture decision telemetry into `regime_snapshots.jsonl`.
+- [~] Record the evidence-based Generation 1 closeout decision.
 
 ## Current Action
 
-Update Alpha Pulse Telegram presentation to the locked v1.02 layouts (Alpha Pulse / Heartbeat, Market Move, distinct context, NO_CLEAR_ROTATION wording fix).
+Record the evidence-based Generation 1 closeout decision.
 
 ## Validation Evidence
 

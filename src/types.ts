@@ -448,6 +448,8 @@ export interface AccuracySnapshotFields extends MarketDataFreshnessFields {
   tempo: string;
   tapeState: string;
   nextScanAt: string;
+  outlookState?: string;
+  nowPosture?: string;
 }
 
 
